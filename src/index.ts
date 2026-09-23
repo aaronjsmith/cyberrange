@@ -303,6 +303,9 @@ const lid='${lab.id}';
 let i=document.getElementById('in');
 const o=document.getElementById('out');
 const pr=document.getElementById('prompt');
+
+// Focus input when clicking anywhere in the shell
+if(o) o.addEventListener('click', () => { i && i.focus(); });
 let h=${JSON.stringify(commandHistory)};
 let s=${step};
 let m='${state.mode}';
