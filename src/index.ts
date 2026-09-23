@@ -264,7 +264,7 @@ ${baseStyles}
 .out { flex: 1; background: #0a0a0a; border: 1px solid var(--border); border-radius: var(--r2); padding: 12px; font-family: Consolas,monospace; font-size: 12px; line-height: 1.5; color: #d4d4d4; overflow-y: auto; min-height: 300px; white-space: pre-wrap; }
 .ipc { display: flex; gap: 8px; margin-top: 12px; }
 .pr { color: var(--accent); font-family: Consolas,monospace; font-size: 12px; white-space: nowrap; }
-.in { flex: 1; background: transparent; border: none; padding: 0; margin: 0; font-family: Consolas,monospace; font-size: 12px; color: var(--text); outline: none; }
+.in { background: transparent; border: none; padding: 0; margin: 0; font-family: Consolas,monospace; font-size: 12px; color: var(--text); outline: none; display: inline; }
 .in:focus { outline: none; }
 .input-line { display: flex; align-items: center; gap: 8px; }
 .sb { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
@@ -296,8 +296,7 @@ ${step>0 ? '<button class="ab" onclick="prevStep()">← Previous</button>' : ''}
 </div>
 <div class="shell">
 <div class="sh"><span class="st2">Terminal (${shellType})</span><div style="display:flex;gap:8px;">${modeTabs(state.mode)}</div><div style="margin-top:8px;">${shellTabs(shellType)}</div></div>
-<div class="out" id="out">${history}</div>
-<div class="input-line"><span class="pr" id="prompt">${prompt}</span><input type="text" class="in" id="in" autocomplete="off" autofocus/></div>
+<div class="out" id="out">${history}<span class="input-line"><span class="pr" id="prompt">${prompt}</span><span class="in" id="in" contenteditable="true" autocomplete="off"></span></span></div>
 </div></div></div></div>
 <script>
 const lid='${lab.id}';
@@ -306,14 +305,40 @@ const o=document.getElementById('out');
 const pr=document.getElementById('prompt');
 
 // Focus input when clicking anywhere in the shell output
-if(o) o.addEventListener('click', () => { i && i.focus(); });
+if(o) o.addEventListener('click', () => { 
+  if(i) { 
+    i.focus();
+    // Move cursor to end
+    const range = document.createRange();
+    const sel = window.getSelection();
+    range.selectNodeContents(i);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+});
 
 // Only set up listeners if elements exist
 if(i) {
   i.addEventListener('keydown',e=>{
-    if(e.key=='ArrowUp'&&h[0]){e.preventDefault();i.value=h[h.length-1];}
-    if(e.key=='Enter'){e.preventDefault();exec(e);}
+    if(e.key=='ArrowUp'&&h[0]){
+      e.preventDefault();
+      i.textContent=h[h.length-1];
+      // Move cursor to end
+      const range = document.createRange();
+      const sel = window.getSelection();
+      range.selectNodeContents(i);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    if(e.key=='Enter'){
+      e.preventDefault();
+      exec(e);
+    }
   });
+  // Initial focus
+  i.focus();
 }
 
 let h=${JSON.stringify(commandHistory)};
@@ -354,16 +379,16 @@ function resetSession() {
 
 async function exec(e){
   e.preventDefault();
-  const c=i.value.trim();
+  const c=i.textContent.trim();
   if(!c)return;
   
-  // Add command to output
-  const he=document.createElement('div');
-  he.innerHTML='<span style="color:var(--accent)">'+pr.textContent+'</span> <span style="color:#fff">'+esc(c)+'</span>';
-  o.appendChild(he);
+  // Add command to output (the input line already has the prompt and command)
+  // Just add a newline after it
+  const br=document.createElement('div');
+  o.appendChild(br);
   
   // Clear the input
-  i.value='';
+  i.textContent='';
   try{
     const r=await fetch('/api/labs/'+lid+'/command',{
       method:'POST',headers:{'Content-Type':'application/json'},
