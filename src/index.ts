@@ -307,6 +307,15 @@ const pr=document.getElementById('prompt');
 
 // Focus input when clicking anywhere in the shell output
 if(o) o.addEventListener('click', () => { i && i.focus(); });
+
+// Only set up listeners if elements exist
+if(i) {
+  i.addEventListener('keydown',e=>{
+    if(e.key=='ArrowUp'&&h[0]){e.preventDefault();i.value=h[h.length-1];}
+    if(e.key=='Enter'){e.preventDefault();exec(e);}
+  });
+}
+
 let h=${JSON.stringify(commandHistory)};
 let s=${step};
 let m='${state.mode}';
@@ -342,10 +351,7 @@ function resetSession() {
   }
 }
 
-i.addEventListener('keydown',e=>{
-        if(e.key=='ArrowUp'&&h[0]){e.preventDefault();i.value=h[h.length-1];}
-        if(e.key=='Enter'){e.preventDefault();exec(e);}
-      });
+
 async function exec(e){
   e.preventDefault();
   const c=i.value.trim();
