@@ -388,13 +388,16 @@ async function exec(e, currentInput){
   const c=currentInput.textContent.trim();
   if(!c)return;
   
-  // Move cursor to end of input so user can see what they typed
-  const range = document.createRange();
-  const sel = window.getSelection();
-  range.selectNodeContents(currentInput);
-  range.collapse(false);
-  sel.removeAllRanges();
-  sel.addRange(range);
+  // The current input line already has prompt + command
+  // We just need to make it non-editable and add a newline
+  const inputLine = currentInput.parentElement;
+  if(inputLine) {
+    // Remove contenteditable from current input to make it static text
+    currentInput.removeAttribute('contenteditable');
+    // Add a newline after the command
+    const br = document.createElement('div');
+    o.insertBefore(br, inputLine.nextSibling);
+  }
   
   try{
     const r=await fetch('/api/labs/'+lid+'/command',{
@@ -407,7 +410,7 @@ async function exec(e, currentInput){
     if(d.output){const e=document.createElement('div');e.textContent=d.output;o.appendChild(e);}
     if(d.error){const e=document.createElement('div');e.innerHTML='<span style="color:#ff5555">'+esc(d.error)+'</span>';o.appendChild(e);}
     
-    // Create new input line for next command
+    // Create new input line for next command (prompt + editable input)
     const newLine=document.createElement('span');
     newLine.className='input-line';
     newLine.innerHTML='<span class="pr">'+pr.textContent+'</span><span class="in" contenteditable="true"></span>';
@@ -429,7 +432,14 @@ async function exec(e, currentInput){
     if(d.stepChanged!==undefined&&d.stepChanged)window.location.reload();
     else if(st!==pr.textContent.split(' ')[0])window.location.reload();
     
+    // Focus the new input
     i.focus();
+    const range = document.createRange();
+    const sel = window.getSelection();
+    range.selectNodeContents(i);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
   }catch(err){const e=document.createElement('div');e.innerHTML='<span style="color:#ff5555">Error</span>';o.appendChild(e);}
 }
 function setMode(x){saveSession();window.location.href='/labs/'+lid+'?mode='+x+'&step='+s+'&shellType='+st+'&attack='+a+'&baseline='+b;}
