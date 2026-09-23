@@ -291,6 +291,7 @@ ${attackActive ? '<span class="sb sb-a">ATTACK ACTIVE</span>' : baselineEstablis
 ${lab.tags.map(t=>`<span class="tag">${t}</span>`).join('')}
 </div>
 ${step>0 ? '<button class="ab" onclick="prevStep()">← Previous</button>' : ''}
+      <button class="ab" onclick="resetSession()" style="margin-top: 8px;">🔄 Reset Session</button>
 </div>
 <div class="shell">
 <div class="sh"><span class="st2">Terminal (${shellType})</span><div style="display:flex;gap:8px;">${modeTabs(state.mode)}</div><div style="margin-top:8px;">${shellTabs(shellType)}</div></div>
@@ -311,6 +312,35 @@ let m='${state.mode}';
 let st='${shellType}';
 let a=${attackActive};
 let b=${baselineEstablished};
+
+// Load session from localStorage
+const stored = localStorage.getItem('cyberrange-session-' + lid);
+if(stored) {
+  try {
+    const storedData = JSON.parse(stored);
+    if(storedData.commandHistory) h = storedData.commandHistory;
+    if(storedData.step !== undefined) s = storedData.step;
+    if(storedData.mode) m = storedData.mode;
+    if(storedData.shellType) st = storedData.shellType;
+    if(storedData.attackActive !== undefined) a = storedData.attackActive;
+    if(storedData.baselineEstablished !== undefined) b = storedData.baselineEstablished;
+  } catch(e) {}
+}
+
+// Save session to localStorage
+function saveSession() {
+  const data = { commandHistory: h, step: s, mode: m, shellType: st, attackActive: a, baselineEstablished: b };
+  localStorage.setItem('cyberrange-session-' + lid, JSON.stringify(data));
+}
+
+// Reset session
+function resetSession() {
+  if(confirm('Reset this lab session? All command history and progress will be cleared.')) {
+    localStorage.removeItem('cyberrange-session-' + lid);
+    window.location.reload();
+  }
+}
+
 i.addEventListener('keydown',e=>{if(e.key=='ArrowUp'&&h[0]){e.preventDefault();i.value=h[h.length-1]}});
 async function exec(e){
   e.preventDefault();
@@ -330,13 +360,13 @@ async function exec(e){
     if(d.error){const e=document.createElement('div');e.innerHTML='<span style="color:#ff5555">'+esc(d.error)+'</span>';o.appendChild(e);}
     o.scrollTop=o.scrollHeight;
     if(d.stepChanged!==undefined&&d.stepChanged)window.location.reload();
-    else{h=d.commandHistory||h;s=d.currentStep!==undefined?d.currentStep:s;m=d.mode||m;st=d.shellType||st;a=d.attackActive!==undefined?d.attackActive:a;b=d.baselineEstablished!==undefined?d.baselineEstablished:b;if(st!==pr.textContent.split(' ')[0])window.location.reload();}
+    else{h=d.commandHistory||h;s=d.currentStep!==undefined?d.currentStep:s;m=d.mode||m;st=d.shellType||st;a=d.attackActive!==undefined?d.attackActive:a;b=d.baselineEstablished!==undefined?d.baselineEstablished:b;saveSession();if(st!==pr.textContent.split(' ')[0])window.location.reload();}
   }catch(err){const e=document.createElement('div');e.innerHTML='<span style="color:#ff5555">Error</span>';o.appendChild(e);}
   i.disabled=false;i.focus();
 }
-function setMode(x){window.location.href='/labs/'+lid+'?mode='+x+'&step='+s+'&shellType='+st+'&attack='+a+'&baseline='+b;}
-function setShellType(x){window.location.href='/labs/'+lid+'?mode='+m+'&step='+s+'&shellType='+x+'&attack='+a+'&baseline='+b;}
-function prevStep(){window.location.href='/labs/'+lid+'?mode='+m+'&step='+Math.max(0,s-1)+'&shellType='+st+'&attack='+a+'&baseline='+b;}
+function setMode(x){saveSession();window.location.href='/labs/'+lid+'?mode='+x+'&step='+s+'&shellType='+st+'&attack='+a+'&baseline='+b;}
+function setShellType(x){saveSession();window.location.href='/labs/'+lid+'?mode='+m+'&step='+s+'&shellType='+x+'&attack='+a+'&baseline='+b;}
+function prevStep(){saveSession();window.location.href='/labs/'+lid+'?mode='+m+'&step='+Math.max(0,s-1)+'&shellType='+st+'&attack='+a+'&baseline='+b;}
 </script>
 </body></html>`;
 };
