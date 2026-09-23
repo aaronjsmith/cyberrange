@@ -263,9 +263,10 @@ ${baseStyles}
 .tab:hover { border-color: var(--text3); }
 .out { flex: 1; background: #0a0a0a; border: 1px solid var(--border); border-radius: var(--r2); padding: 12px; font-family: Consolas,monospace; font-size: 12px; line-height: 1.5; color: #d4d4d4; overflow-y: auto; min-height: 300px; white-space: pre-wrap; }
 .ipc { display: flex; gap: 8px; margin-top: 12px; }
-.pr { color: var(--accent); font-family: Consolas,monospace; font-size: 12px; padding: 8px 0; white-space: nowrap; }
-.in { flex: 1; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r2); padding: 8px 12px; font-family: Consolas,monospace; font-size: 12px; color: var(--text); outline: none; }
-.in:focus { border-color: var(--accent); }
+.pr { color: var(--accent); font-family: Consolas,monospace; font-size: 12px; white-space: nowrap; }
+.in { flex: 1; background: transparent; border: none; padding: 0; margin: 0; font-family: Consolas,monospace; font-size: 12px; color: var(--text); outline: none; }
+.in:focus { outline: none; }
+.input-line { display: flex; align-items: center; gap: 8px; }
 .sb { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
 .sb-b { background: rgba(74,222,128,.15); color: var(--good); border: 1px solid rgba(74,222,128,.3); }
 .sb-a { background: rgba(248,113,113,.15); color: var(--bad); border: 1px solid rgba(248,113,113,.3); animation: p 1s infinite; }
@@ -295,11 +296,7 @@ ${step>0 ? '<button class="ab" onclick="prevStep()">← Previous</button>' : ''}
 </div>
 <div class="shell">
 <div class="sh"><span class="st2">Terminal (${shellType})</span><div style="display:flex;gap:8px;">${modeTabs(state.mode)}</div><div style="margin-top:8px;">${shellTabs(shellType)}</div></div>
-<div class="out" id="out">${history}</div>
-<form class="ipc" onsubmit="exec(event)">
-<span class="pr" id="prompt">${prompt}</span>
-<input type="text" class="in" id="in" autocomplete="off" autofocus/>
-</form>
+<div class="out" id="out">${history}<div class="input-line"><span class="pr" id="prompt">${prompt}</span><input type="text" class="in" id="in" autocomplete="off" autofocus/></div></div>
 </div></div></div></div>
 <script>
 const lid='${lab.id}';
@@ -346,10 +343,15 @@ async function exec(e){
   e.preventDefault();
   const c=i.value.trim();
   if(!c)return;
-  i.value='';i.disabled=true;
+  i.disabled=true;
+  // Remove current input line
+  const inputLine = o.querySelector('.input-line');
+  if(inputLine) o.removeChild(inputLine);
+  
+  // Add command to output
   const he=document.createElement('div');
   he.innerHTML='<span style="color:var(--accent)">'+pr.textContent+'</span> <span style="color:#fff">'+esc(c)+'</span>';
-  o.appendChild(he);o.scrollTop=o.scrollHeight;
+  o.appendChild(he);
   try{
     const r=await fetch('/api/labs/'+lid+'/command',{
       method:'POST',headers:{'Content-Type':'application/json'},
@@ -358,6 +360,13 @@ async function exec(e){
     const d=await r.json();
     if(d.output){const e=document.createElement('div');e.textContent=d.output;o.appendChild(e);}
     if(d.error){const e=document.createElement('div');e.innerHTML='<span style="color:#ff5555">'+esc(d.error)+'</span>';o.appendChild(e);}
+    // Add output and new input line
+    if(d.output){const e=document.createElement('div');e.textContent=d.output;o.appendChild(e);}
+    if(d.error){const e=document.createElement('div');e.innerHTML='<span style="color:#ff5555">'+esc(d.error)+'</span>';o.appendChild(e);}
+    
+    // Add new input line
+    o.innerHTML += '<div class="input-line"><span class="pr" id="prompt">'+pr.textContent+'</span><input type="text" class="in" id="in" autocomplete="off" autofocus/></div>';
+    
     o.scrollTop=o.scrollHeight;
     if(d.stepChanged!==undefined&&d.stepChanged)window.location.reload();
     else{h=d.commandHistory||h;s=d.currentStep!==undefined?d.currentStep:s;m=d.mode||m;st=d.shellType||st;a=d.attackActive!==undefined?d.attackActive:a;b=d.baselineEstablished!==undefined?d.baselineEstablished:b;saveSession();if(st!==pr.textContent.split(' ')[0])window.location.reload();}
