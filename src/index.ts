@@ -349,7 +349,7 @@ async function exec(e){
   e.preventDefault();
   const c=i.value.trim();
   if(!c)return;
-  i.disabled=true;
+  
   // Add command to output (before the input line)
   const he=document.createElement('div');
   he.innerHTML='<span style="color:var(--accent)">'+pr.textContent+'</span> <span style="color:#fff">'+esc(c)+'</span>';
@@ -370,7 +370,7 @@ async function exec(e){
     if(d.stepChanged!==undefined&&d.stepChanged)window.location.reload();
     else{h=d.commandHistory||h;s=d.currentStep!==undefined?d.currentStep:s;m=d.mode||m;st=d.shellType||st;a=d.attackActive!==undefined?d.attackActive:a;b=d.baselineEstablished!==undefined?d.baselineEstablished:b;saveSession();if(st!==pr.textContent.split(' ')[0])window.location.reload();}
   }catch(err){const e=document.createElement('div');e.innerHTML='<span style="color:#ff5555">Error</span>';o.insertBefore(e, o.lastChild);}
-  i.disabled=false;i.focus();
+  i.focus();
 }
 function setMode(x){saveSession();window.location.href='/labs/'+lid+'?mode='+x+'&step='+s+'&shellType='+st+'&attack='+a+'&baseline='+b;}
 function setShellType(x){saveSession();window.location.href='/labs/'+lid+'?mode='+m+'&step='+s+'&shellType='+x+'&attack='+a+'&baseline='+b;}
