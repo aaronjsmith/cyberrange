@@ -363,12 +363,12 @@ async function exec(e){
     const d=await r.json();
     if(d.output){const e=document.createElement('div');e.textContent=d.output;o.appendChild(e);}
     if(d.error){const e=document.createElement('div');e.innerHTML='<span style="color:#ff5555">'+esc(d.error)+'</span>';o.appendChild(e);}
-    // Add output and new input line
-    if(d.output){const e=document.createElement('div');e.textContent=d.output;o.appendChild(e);}
-    if(d.error){const e=document.createElement('div');e.innerHTML='<span style="color:#ff5555">'+esc(d.error)+'</span>';o.appendChild(e);}
     
     // Add new input line
-    o.innerHTML += '<div class="input-line"><span class="pr" id="prompt">'+pr.textContent+'</span><input type="text" class="in" id="in" autocomplete="off" autofocus/></div>';
+    const newInputLine = document.createElement('div');
+    newInputLine.className = 'input-line';
+    newInputLine.innerHTML = '<span class="pr" id="prompt">'+pr.textContent+'</span><input type="text" class="in" id="in" autocomplete="off" autofocus/>';
+    o.appendChild(newInputLine);
     
     o.scrollTop=o.scrollHeight;
     if(d.stepChanged!==undefined&&d.stepChanged)window.location.reload();
