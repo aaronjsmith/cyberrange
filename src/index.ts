@@ -50,7 +50,7 @@ export default {
       return new Response(
         JSON.stringify({
           environment: env.CYBERRANGE_ENV || 'development',
-          uptime: process.uptime(),
+          timestamp: Date.now(),
         }),
         { headers: { 'Content-Type': 'application/json' } }
       );
