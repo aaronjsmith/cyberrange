@@ -296,7 +296,8 @@ ${step>0 ? '<button class="ab" onclick="prevStep()">← Previous</button>' : ''}
 </div>
 <div class="shell">
 <div class="sh"><span class="st2">Terminal (${shellType})</span><div style="display:flex;gap:8px;">${modeTabs(state.mode)}</div><div style="margin-top:8px;">${shellTabs(shellType)}</div></div>
-<div class="out" id="out">${history}<div class="input-line"><span class="pr" id="prompt">${prompt}</span><input type="text" class="in" id="in" autocomplete="off" autofocus/></div></div>
+<div class="out" id="out">${history}</div>
+<div class="input-line"><span class="pr" id="prompt">${prompt}</span><input type="text" class="in" id="in" autocomplete="off" autofocus/></div>
 </div></div></div></div>
 <script>
 const lid='${lab.id}';
@@ -304,7 +305,7 @@ let i=document.getElementById('in');
 const o=document.getElementById('out');
 const pr=document.getElementById('prompt');
 
-// Focus input when clicking anywhere in the shell
+// Focus input when clicking anywhere in the shell output
 if(o) o.addEventListener('click', () => { i && i.focus(); });
 let h=${JSON.stringify(commandHistory)};
 let s=${step};
@@ -350,10 +351,10 @@ async function exec(e){
   const c=i.value.trim();
   if(!c)return;
   
-  // Add command to output (before the input line)
+  // Add command to output
   const he=document.createElement('div');
   he.innerHTML='<span style="color:var(--accent)">'+pr.textContent+'</span> <span style="color:#fff">'+esc(c)+'</span>';
-  o.insertBefore(he, o.lastChild);
+  o.appendChild(he);
   
   // Clear the input
   i.value='';
@@ -363,13 +364,13 @@ async function exec(e){
       body:JSON.stringify({command:c,currentStep:s,mode:m,shellType:st,attackActive:a,baselineEstablished:b})
     });
     const d=await r.json();
-    if(d.output){const e=document.createElement('div');e.textContent=d.output;o.insertBefore(e, o.lastChild);}
-    if(d.error){const e=document.createElement('div');e.innerHTML='<span style="color:#ff5555">'+esc(d.error)+'</span>';o.insertBefore(e, o.lastChild);}
+    if(d.output){const e=document.createElement('div');e.textContent=d.output;o.appendChild(e);}
+    if(d.error){const e=document.createElement('div');e.innerHTML='<span style="color:#ff5555">'+esc(d.error)+'</span>';o.appendChild(e);}
     
     o.scrollTop=o.scrollHeight;
     if(d.stepChanged!==undefined&&d.stepChanged)window.location.reload();
     else{h=d.commandHistory||h;s=d.currentStep!==undefined?d.currentStep:s;m=d.mode||m;st=d.shellType||st;a=d.attackActive!==undefined?d.attackActive:a;b=d.baselineEstablished!==undefined?d.baselineEstablished:b;saveSession();if(st!==pr.textContent.split(' ')[0])window.location.reload();}
-  }catch(err){const e=document.createElement('div');e.innerHTML='<span style="color:#ff5555">Error</span>';o.insertBefore(e, o.lastChild);}
+  }catch(err){const e=document.createElement('div');e.innerHTML='<span style="color:#ff5555">Error</span>';o.appendChild(e);}
   i.focus();
 }
 function setMode(x){saveSession();window.location.href='/labs/'+lid+'?mode='+x+'&step='+s+'&shellType='+st+'&attack='+a+'&baseline='+b;}
