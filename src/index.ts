@@ -300,7 +300,7 @@ ${step>0 ? '<button class="ab" onclick="prevStep()">← Previous</button>' : ''}
 </div></div></div></div>
 <script>
 const lid='${lab.id}';
-const i=document.getElementById('in');
+let i=document.getElementById('in');
 const o=document.getElementById('out');
 const pr=document.getElementById('prompt');
 let h=${JSON.stringify(commandHistory)};
@@ -369,6 +369,9 @@ async function exec(e){
     newInputLine.className = 'input-line';
     newInputLine.innerHTML = '<span class="pr" id="prompt">'+pr.textContent+'</span><input type="text" class="in" id="in" autocomplete="off" autofocus/>';
     o.appendChild(newInputLine);
+    
+    // Update i to reference the new input element
+    i = document.getElementById('in');
     
     o.scrollTop=o.scrollHeight;
     if(d.stepChanged!==undefined&&d.stepChanged)window.location.reload();
