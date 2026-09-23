@@ -338,7 +338,10 @@ function resetSession() {
   }
 }
 
-i.addEventListener('keydown',e=>{if(e.key=='ArrowUp'&&h[0]){e.preventDefault();i.value=h[h.length-1]}});
+i.addEventListener('keydown',e=>{
+        if(e.key=='ArrowUp'&&h[0]){e.preventDefault();i.value=h[h.length-1];}
+        if(e.key=='Enter'){e.preventDefault();exec(e);}
+      });
 async function exec(e){
   e.preventDefault();
   const c=i.value.trim();
