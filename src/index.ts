@@ -306,40 +306,46 @@ const pr=document.getElementById('prompt');
 
 // Focus input when clicking anywhere in the shell output
 if(o) o.addEventListener('click', () => { 
-  if(i) { 
-    i.focus();
-    // Move cursor to end
+  const activeInput = o.querySelector('.in');
+  if(activeInput) { 
+    activeInput.focus();
     const range = document.createRange();
     const sel = window.getSelection();
-    range.selectNodeContents(i);
+    range.selectNodeContents(activeInput);
     range.collapse(false);
     sel.removeAllRanges();
     sel.addRange(range);
   }
 });
 
-// Only set up listeners if elements exist
-if(i) {
-  i.addEventListener('keydown',e=>{
-    if(e.key=='ArrowUp'&&h[0]){
-      e.preventDefault();
-      i.textContent=h[h.length-1];
-      // Move cursor to end
-      const range = document.createRange();
-      const sel = window.getSelection();
-      range.selectNodeContents(i);
-      range.collapse(false);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    }
-    if(e.key=='Enter'){
-      e.preventDefault();
-      exec(e);
+// Use event delegation - listen for keydown on .out, but only handle .in elements
+if(o) {
+  o.addEventListener('keydown', function(e) {
+    const target = e.target;
+    // Only handle if the keydown is on a .in span
+    if(target && target.classList && target.classList.contains('in')) {
+      if(e.key=='ArrowUp'&&h[0]){
+        e.preventDefault();
+        target.textContent=h[h.length-1];
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(target);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      if(e.key=='Enter'){
+        e.preventDefault();
+        // Store reference to current input before exec
+        const currentInput = target;
+        exec(e, currentInput);
+      }
     }
   });
-  // Initial focus
-  i.focus();
 }
+
+// Initial focus
+if(i) i.focus();
 
 let h=${JSON.stringify(commandHistory)};
 let s=${step};
@@ -377,32 +383,54 @@ function resetSession() {
 }
 
 
-async function exec(e){
+async function exec(e, currentInput){
   e.preventDefault();
-  const c=i.textContent.trim();
+  const c=currentInput.textContent.trim();
   if(!c)return;
   
-  // Add command to output (the input line already has the prompt and command)
-  // Just add a newline after it
-  const br=document.createElement('div');
-  o.appendChild(br);
+  // Move cursor to end of input so user can see what they typed
+  const range = document.createRange();
+  const sel = window.getSelection();
+  range.selectNodeContents(currentInput);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
   
-  // Clear the input
-  i.textContent='';
   try{
     const r=await fetch('/api/labs/'+lid+'/command',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({command:c,currentStep:s,mode:m,shellType:st,attackActive:a,baselineEstablished:b})
     });
     const d=await r.json();
+    
+    // Add output
     if(d.output){const e=document.createElement('div');e.textContent=d.output;o.appendChild(e);}
     if(d.error){const e=document.createElement('div');e.innerHTML='<span style="color:#ff5555">'+esc(d.error)+'</span>';o.appendChild(e);}
     
+    // Create new input line for next command
+    const newLine=document.createElement('span');
+    newLine.className='input-line';
+    newLine.innerHTML='<span class="pr">'+pr.textContent+'</span><span class="in" contenteditable="true"></span>';
+    o.appendChild(newLine);
+    
+    // Update i to the new input
+    i=newLine.querySelector('.in');
+    
+    // Update h (command history)
+    h=d.commandHistory||[...h,c];
+    s=d.currentStep!==undefined?d.currentStep:s;
+    m=d.mode||m;
+    st=d.shellType||st;
+    a=d.attackActive!==undefined?d.attackActive:a;
+    b=d.baselineEstablished!==undefined?d.baselineEstablished:b;
+    saveSession();
+    
     o.scrollTop=o.scrollHeight;
     if(d.stepChanged!==undefined&&d.stepChanged)window.location.reload();
-    else{h=d.commandHistory||h;s=d.currentStep!==undefined?d.currentStep:s;m=d.mode||m;st=d.shellType||st;a=d.attackActive!==undefined?d.attackActive:a;b=d.baselineEstablished!==undefined?d.baselineEstablished:b;saveSession();if(st!==pr.textContent.split(' ')[0])window.location.reload();}
+    else if(st!==pr.textContent.split(' ')[0])window.location.reload();
+    
+    i.focus();
   }catch(err){const e=document.createElement('div');e.innerHTML='<span style="color:#ff5555">Error</span>';o.appendChild(e);}
-  i.focus();
 }
 function setMode(x){saveSession();window.location.href='/labs/'+lid+'?mode='+x+'&step='+s+'&shellType='+st+'&attack='+a+'&baseline='+b;}
 function setShellType(x){saveSession();window.location.href='/labs/'+lid+'?mode='+m+'&step='+s+'&shellType='+x+'&attack='+a+'&baseline='+b;}
