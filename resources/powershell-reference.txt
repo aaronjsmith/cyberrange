@@ -1,0 +1,125 @@
+POWERSHELL COMMAND REFERENCE - CYBERRANGE BLUE TEAM TRAINING
+==============================================================
+
+SYSTEM INFORMATION COMMANDS:
+----------------------------
+whoami                    - Show current user
+hostname                  - Show computer name
+$env:COMPUTERNAME        - Get computer name from environment
+Get-Date                 - Show current date/time
+Get-Location             - Show current directory (pwd alias)
+Set-Location <path>      - Change directory (cd alias)
+Get-ChildItem            - List files/directories (ls/dir alias)
+
+PROCESS MANAGEMENT:
+-------------------
+Get-Process              - List all running processes
+Get-Process -Name <name> - Get specific process
+Stop-Process -Name <name>- Stop a process
+Start-Process <executable> - Start a new process
+Get-Service              - List all services
+Get-Service | Where-Object { $_.Status -eq "Running" } - List running services
+Start-Service <name>     - Start a service
+Stop-Service <name>      - Stop a service
+Restart-Service <name>   - Restart a service
+
+NETWORK COMMANDS:
+-----------------
+Get-NetTCPConnection     - Show all TCP connections
+Get-NetTCPConnection -State Listen - Show listening ports
+Test-NetConnection <host> - Test connection to host
+Get-NetIPAddress         - Show IP addresses
+Get-NetAdapter           - Show network adapters
+Get-NetFirewallRule      - Show firewall rules
+
+LOG AND EVENT VIEWING:
+-----------------------
+Get-WinEvent -LogName Security -MaxEvents 10 - View security logs
+Get-WinEvent -LogName System -MaxEvents 10 - View system logs
+Get-WinEvent -FilterHashtable @{LogName="Security"; ID=4625} - Filter for specific event ID
+Get-EventLog -LogName Security -Newest 10 - Alternative event log viewing
+
+SYSTEM MONITORING:
+------------------
+Get-WmiObject Win32_Processor - Get CPU information
+Get-WmiObject Win32_OperatingSystem - Get OS information
+Get-WmiObject Win32_LoggedOnUser - Get logged on users
+Get-Counter "\Processor(_Total)\% Processor Time" - Get CPU usage
+Get-Counter "\Memory\Available MBytes" - Get available memory
+
+FILE SYSTEM:
+-----------
+Get-ChildItem -Recurse - List files recursively
+Get-ChildItem -Path C:\ -Recurse - Include * -Filter *.txt - Find text files
+Copy-Item <source> <dest> - Copy a file
+Move-Item <source> <dest> - Move a file
+Remove-Item <path> - Delete a file
+New-Item <path> -type file - Create new file
+
+USER MANAGEMENT:
+----------------
+Get-LocalUser             - List all local users
+Get-LocalUser -Name <name> - Get specific user
+New-LocalUser <name>     - Create new user
+Remove-LocalUser <name>  - Delete user
+Add-LocalGroupMember -Group "Administrators" -Member <user> - Add to admin group
+
+SECURITY AND AUDITING:
+----------------------
+Get-LocalGroup           - List all local groups
+Get-LocalGroupMember -Group <name> - List group members
+Get-Acl <path>           - Get ACL for file/directory
+Set-Acl -Path <path> -AclObject <acl> - Set ACL
+Get-HotFix              - List installed hotfixes/updates
+Get-WindowsOptionalFeature -Online | Where-Object State -eq Enabled - List enabled features
+
+NETWORK SECURITY:
+-----------------
+Get-NetFirewallProfile   - Show firewall profiles
+Get-NetFirewallRule | Where-Object { $_.Enabled -eq $true } - List enabled firewall rules
+New-NetFirewallRule -DisplayName <name> -Direction Inbound -Action Block - Create firewall rule
+Get-NetIPConfiguration   - Show IP configuration
+Get-DnsClientServerAddress - Get DNS servers
+
+ADVANCED MONITORING:
+--------------------
+Get-WinEvent -FilterHashtable @{
+  LogName='Security'
+  StartTime=[datetime]::Today.AddDays(-1)
+  EndTime=[datetime]::Today
+} - Get last 24 hours of security logs
+
+Get-WinEvent -FilterHashtable @{
+  LogName='Security'
+  ID=4624,4625,4648,4672
+} | Where-Object TimeCreated -gt (Get-Date).AddMinutes(-5) - Recent logon events
+
+BASELINE ESTABLISHMENT SCRIPT:
+------------------------------
+# Save baseline to file
+Get-Process | Out-File C:\baseline\processes.txt
+Get-NetTCPConnection -State Listen | Out-File C:\baseline\listening_ports.txt
+Get-Service | Where-Object { $_.Status -eq "Running" } | Out-File C:\baseline\running_services.txt
+Get-WinEvent -LogName Security -MaxEvents 5 | Out-File C:\baseline\security_events.txt
+
+ATTACK DETECTION SCRIPT:
+------------------------
+# Detect failed logins
+$failedLogins = Get-WinEvent -FilterHashtable @{LogName='Security'; ID=4625} | Where-Object TimeCreated -gt (Get-Date).AddMinutes(-5)
+if ($failedLogins.Count -gt 0) { Write-Host "[ALERT] Failed logins detected!" -ForegroundColor Red }
+
+# Detect RDP connections from suspicious IPs
+$rdpConnections = Get-WinEvent -LogName Security | Where-Object { $_.Id -eq 4624 -and $_.Message -like "*Logon Type: 10*" }
+if ($rdpConnections) { Write-Host "[INFO] RDP connections found" -ForegroundColor Yellow }
+
+CYBERRANGE-SPECIFIC COMMANDS:
+-------------------------------
+baseline           - Establish system baseline
+start-attack       - Begin attack simulation
+shell-type bash    - Switch to bash shell
+shell-type powershell - Switch to PowerShell shell
+help              - Show available commands
+lab-info          - Show lab information
+
+TIP: Use Get-Help <command> -Full for detailed help on any PowerShell command.
+TIP: Use Get-Alias to see all available aliases.

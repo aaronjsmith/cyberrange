@@ -1,0 +1,67 @@
+CYBERRANGE BLUE TEAM TRAINING - COURSE MATERIALS
+==================================================
+
+Module 1: Introduction to Blue Team Operations
+-----------------------------------------------
+- Understanding the Blue Team role in cybersecurity
+- Incident detection and response frameworks
+- Security monitoring fundamentals
+- Threat intelligence basics
+
+Module 2: System Baseline Establishment
+----------------------------------------
+1. Document normal system state
+2. Identify critical processes and services
+3. Record network connections
+4. Establish performance benchmarks
+
+Key Commands (Linux):
+- ps aux - List all running processes
+- netstat -tuln - Show listening ports
+- top - View system resource usage
+- tail -n 20 /var/log/auth.log - Check authentication logs
+
+Key Commands (Windows):
+- Get-Process - List all running processes
+- Get-NetTCPConnection -State Listen - Show listening ports
+- Get-Service | Where-Object { $_.Status -eq "Running" } - List running services
+- Get-WinEvent -LogName Security -MaxEvents 5 - View security logs
+
+Module 3: Attack Detection
+--------------------------
+- Identifying brute force attacks
+- SSH attack patterns
+- RDP attack patterns
+- Log analysis techniques
+
+Module 4: Response Procedures
+-----------------------------
+- Isolating affected systems
+- Preserving evidence
+- Incident documentation
+- Escalation protocols
+
+PRACTICAL EXERCISES:
+1. Network Intrusion Detection Lab
+   - Establish baseline on Linux system
+   - Detect SSH brute force attack
+   - Respond with appropriate countermeasures
+
+2. Windows Server 2025 Hardening Lab
+   - Document Windows Server baseline
+   - Detect RDP brute force attack
+   - Apply security hardening techniques
+
+3. Web Application Attack Detection Lab
+   - Monitor web application logs
+   - Detect SQL injection attempts
+   - Detect XSS attacks
+
+RECOMMENDED TOOLS:
+- Wireshark (Network analysis)
+- Sysmon (Windows system monitoring)
+- Auditd (Linux audit framework)
+- Fail2ban (Intrusion prevention)
+- ELK Stack (Log analysis)
+
+This material supports hands-on cyber range training for blue team operators.

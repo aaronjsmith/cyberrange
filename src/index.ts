@@ -653,8 +653,267 @@ export default {
 
     // Serve resources
     if (path.startsWith('/resources/')) {
-      return new Response('Resource: ' + path.split('/').pop() + '\nNote: Upload files to Cloudflare KV or R2 for actual file serving.', {
+      const resourceName = path.split('/').pop();
+      
+      // Serve actual resource files
+      if (resourceName === 'cyberforce101.pdf.txt') {
+        const content = `CYBERRANGE BLUE TEAM TRAINING - COURSE MATERIALS
+==================================================
+
+Module 1: Introduction to Blue Team Operations
+-----------------------------------------------
+- Understanding the Blue Team role in cybersecurity
+- Incident detection and response frameworks
+- Security monitoring fundamentals
+- Threat intelligence basics
+
+Module 2: System Baseline Establishment
+----------------------------------------
+1. Document normal system state
+2. Identify critical processes and services
+3. Record network connections
+4. Establish performance benchmarks
+
+Key Commands (Linux):
+- ps aux - List all running processes
+- netstat -tuln - Show listening ports
+- top - View system resource usage
+- tail -n 20 /var/log/auth.log - Check authentication logs
+
+Key Commands (Windows):
+- Get-Process - List all running processes
+- Get-NetTCPConnection -State Listen - Show listening ports
+- Get-Service | Where-Object { $_.Status -eq "Running" } - List running services
+- Get-WinEvent -LogName Security -MaxEvents 5 - View security logs
+
+Module 3: Attack Detection
+--------------------------
+- Identifying brute force attacks
+- SSH attack patterns
+- RDP attack patterns
+- Log analysis techniques
+
+Module 4: Response Procedures
+-----------------------------
+- Isolating affected systems
+- Preserving evidence
+- Incident documentation
+- Escalation protocols
+
+PRACTICAL EXERCISES:
+1. Network Intrusion Detection Lab
+   - Establish baseline on Linux system
+   - Detect SSH brute force attack
+   - Respond with appropriate countermeasures
+
+2. Windows Server 2025 Hardening Lab
+   - Document Windows Server baseline
+   - Detect RDP brute force attack
+   - Apply security hardening techniques
+
+3. Web Application Attack Detection Lab
+   - Monitor web application logs
+   - Detect SQL injection attempts
+   - Detect XSS attacks
+
+RECOMMENDED TOOLS:
+- Wireshark (Network analysis)
+- Sysmon (Windows system monitoring)
+- Auditd (Linux audit framework)
+- Fail2ban (Intrusion prevention)
+- ELK Stack (Log analysis)
+
+This material supports hands-on cyber range training for blue team operators.`;
+        return new Response(content, {
+          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        });
+      }
+      
+      if (resourceName === 'powershell-reference.txt') {
+        const psRef = `POWERSHELL COMMAND REFERENCE - CYBERRANGE BLUE TEAM TRAINING
+==============================================================
+
+SYSTEM INFORMATION COMMANDS:
+----------------------------
+whoami                    - Show current user
+hostname                  - Show computer name
+Get-Date                 - Show current date/time
+Get-Location             - Show current directory (pwd)
+Get-ChildItem            - List files/directories
+
+PROCESS MANAGEMENT:
+-------------------
+Get-Process              - List all running processes
+Get-Service | Where-Object { $_.Status -eq "Running" } - List running services
+
+NETWORK COMMANDS:
+-----------------
+Get-NetTCPConnection     - Show all TCP connections
+Get-NetTCPConnection -State Listen - Show listening ports
+
+LOG AND EVENT VIEWING:
+-----------------------
+Get-WinEvent -LogName Security -MaxEvents 10 - View security logs
+Get-WinEvent -FilterHashtable @{LogName="Security"; ID=4625} - Filter for failed logins
+
+SYSTEM MONITORING:
+------------------
+Get-WmiObject Win32_Processor - Get CPU information
+Get-Counter "\\Processor(_Total)\% Processor Time" - Get CPU usage
+
+CYBERRANGE-SPECIFIC COMMANDS:
+-------------------------------
+baseline           - Establish system baseline
+start-attack       - Begin attack simulation
+shell-type bash    - Switch to bash shell
+shell-type powershell - Switch to PowerShell shell
+help              - Show available commands
+lab-info          - Show lab information`;
+        return new Response(psRef, {
+          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        });
+      }
+      
+      if (resourceName === 'windows-server-2025-gui.html') {
+        // Return the Windows GUI simulation HTML
+        const winGuiHtml = `<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Windows Server 2025 GUI Simulation - Cyberrange</title>
+<style>
+  :root { --win-bg: #0a0a0a; --win-dark: #1a1a1a; --win-darker: #000000; --win-light: #ffffff; --win-gray: #808080; --win-blue: #0078d4; --win-text: #e0e0e0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--win-bg); color: var(--win-light); min-height: 100vh; overflow: hidden; }
+  .desktop { display: grid; grid-template-areas: "desktop" "taskbar"; grid-template-rows: 1fr auto; height: 100vh; }
+  .desktop-icons { grid-area: desktop; padding: 20px; display: grid; grid-template-columns: repeat(auto-fill, 80px); gap: 20px; align-content: start; }
+  .icon { width: 80px; text-align: center; cursor: pointer; }
+  .icon img { width: 48px; height: 48px; margin-bottom: 4px; }
+  .icon span { font-size: 11px; color: var(--win-text); background: var(--win-bg); padding: 2px; display: block; }
+  .window { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 600px; height: 400px; background: var(--win-dark); border: 1px solid var(--win-gray); border-radius: 4px; box-shadow: 0 0 20px rgba(0, 120, 212, 0.3); display: none; }
+  .window.active { display: block; }
+  .window-header { background: linear-gradient(90deg, var(--win-blue), #005a9e); padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: move; }
+  .window-title { font-size: 12px; color: var(--win-light); font-weight: bold; }
+  .window-controls { display: flex; gap: 4px; }
+  .window-control { width: 24px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: var(--win-light); cursor: pointer; }
+  .window-control.close { background: #ff5f56; }
+  .window-control.min { background: #ffbd2e; }
+  .window-control.max { background: #2dca30; }
+  .window-content { padding: 10px; height: calc(100% - 28px); overflow: auto; }
+  .taskbar { grid-area: taskbar; background: #000000; border-top: 2px solid #404040; padding: 4px; display: flex; align-items: center; gap: 10px; }
+  .start-button { background: var(--win-dark); border: 2px solid; border-color: #404040 #ffffff #ffffff #404040; padding: 4px 8px; font-size: 12px; color: var(--win-light); cursor: pointer; }
+  .taskbar-item { padding: 4px 8px; font-size: 12px; color: var(--win-text); cursor: pointer; }
+  .taskbar-item:hover { background: rgba(255, 255, 255, 0.1); }
+  .server-info { background: var(--win-dark); border: 1px solid var(--win-gray); padding: 15px; font-family: Consolas, monospace; font-size: 12px; line-height: 1.5; }
+  .server-info h3 { color: var(--win-blue); margin-bottom: 10px; }
+  .event-viewer { background: var(--win-dark); border: 1px solid var(--win-gray); padding: 10px; }
+  .event-viewer table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .event-viewer th { background: var(--win-blue); color: var(--win-light); padding: 4px; text-align: left; }
+  .event-viewer td { padding: 3px; border-bottom: 1px solid var(--win-gray); }
+  .event-viewer tr:nth-child(even) { background: rgba(255, 255, 255, 0.05); }
+  .command-prompt { background: var(--win-dark); border: 1px solid var(--win-gray); padding: 10px; font-family: Consolas, monospace; font-size: 12px; }
+  .command-prompt input { background: transparent; border: none; color: var(--win-light); font-family: Consolas, monospace; font-size: 12px; width: 100%; margin-top: 5px; outline: none; }
+  .command-prompt input:focus { outline: 1px solid var(--win-blue); }
+  .command-output { color: var(--win-text); margin-top: 5px; white-space: pre-wrap; }
+</style>
+</head><body>
+<div class="desktop">
+  <div class="desktop-icons">
+    <div class="icon" onclick="showWindow('server-info')">
+      <div style="width: 48px; height: 48px; background: #0078d4; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 10px;">SRV</div>
+      <span>Server Manager</span>
+    </div>
+    <div class="icon" onclick="showWindow('event-viewer')">
+      <div style="width: 48px; height: 48px; background: #0078d4; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 10px;">EVT</div>
+      <span>Event Viewer</span>
+    </div>
+    <div class="icon" onclick="showWindow('powershell')">
+      <div style="width: 48px; height: 48px; background: #0078d4; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 10px;">PS</div>
+      <span>PowerShell</span>
+    </div>
+    <div class="icon" onclick="showWindow('services')">
+      <div style="width: 48px; height: 48px; background: #0078d4; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 10px;">SVC</div>
+      <span>Services</span>
+    </div>
+  </div>
+  <div class="taskbar">
+    <div class="start-button" onclick="alert('Windows Start Menu - Cyberrange Simulation. Available: Server Manager, Event Viewer, PowerShell, Services')">Windows</div>
+    <div class="taskbar-item" onclick="showWindow('powershell')">PowerShell - Terminal</div>
+    <div style="margin-left: auto; padding: 0 10px; font-size: 11px; color: var(--win-text);">Windows Server 2025 &bull; ${new Date().toLocaleTimeString()}</div>
+  </div>
+  <div id="server-info-window" class="window">
+    <div class="window-header"><span class="window-title">Server Manager - WIN-SRV-2025-01</span>
+      <div class="window-controls"><div class="window-control min">_</div><div class="window-control max">□</div><div class="window-control close" onclick="hideWindow('server-info')">X</div></div>
+    </div>
+    <div class="window-content">
+      <div class="server-info">
+        <h3>Windows Server 2025 Standard</h3>
+        <p><strong>Computer Name:</strong> WIN-SRV-2025-01</p>
+        <p><strong>Domain:</strong> CYBERRANGE.local</p>
+        <p><strong>IP Address:</strong> 192.168.1.10</p>
+        <p><strong>Running Services:</strong> 45</p>
+        <p><strong>Active Connections:</strong> 12</p>
+      </div>
+    </div>
+  </div>
+  <div id="event-viewer-window" class="window">
+    <div class="window-header"><span class="window-title">Event Viewer - Security Log</span>
+      <div class="window-controls"><div class="window-control min">_</div><div class="window-control max">□</div><div class="window-control close" onclick="hideWindow('event-viewer')">X</div></div>
+    </div>
+    <div class="window-content">
+      <div class="event-viewer">
+        <p style="color: #ff5f56; font-weight: bold;">[ALERT] Multiple failed login attempts detected - Possible brute force attack from 203.0.113.45!</p>
+        <table><thead><tr><th>Time</th><th>Event ID</th><th>Message</th></tr></thead><tbody>
+          <tr><td>2026-09-23 14:46:01</td><td>4625</td><td>Failed login from 203.0.113.45</td></tr>
+          <tr><td>2026-09-23 14:46:02</td><td>4625</td><td>Failed login from 203.0.113.45</td></tr>
+          <tr><td>2026-09-23 14:46:03</td><td>4625</td><td>Failed login from 203.0.113.45</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+  <div id="powershell-window" class="window">
+    <div class="window-header"><span class="window-title">Windows PowerShell</span>
+      <div class="window-controls"><div class="window-control min">_</div><div class="window-control max">□</div><div class="window-control close" onclick="hideWindow('powershell')">X</div></div>
+    </div>
+    <div class="window-content">
+      <div class="command-prompt">
+        <p>PS C:\\Users\\blueteam-user></p>
+        <div id="ps-output" class="command-output"></div>
+        <input type="text" id="ps-input" placeholder="Type command..." />
+      </div>
+    </div>
+  </div>
+  <div id="services-window" class="window">
+    <div class="window-header"><span class="window-title">Services</span>
+      <div class="window-controls"><div class="window-control min">_</div><div class="window-control max">□</div><div class="window-control close" onclick="hideWindow('services')">X</div></div>
+    </div>
+    <div class="window-content">
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead><tr><th style="background:#0078d4;color:white;padding:4px;text-align:left;">Name</th><th style="background:#0078d4;color:white;padding:4px;text-align:left;">Status</th></tr></thead>
+        <tbody>
+          <tr><td>WinRM</td><td>Running</td></tr>
+          <tr><td>lanmanserver</td><td>Running</td></tr>
+          <tr><td>RdpSvc</td><td>Running</td></tr>
+          <tr><td>EventLog</td><td>Running</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script>
+function showWindow(id) { document.querySelectorAll('.window').forEach(w=>w.classList.remove('active')); document.getElementById(id+'-window')?.classList.add('active'); if(id==='powershell')document.getElementById('ps-input')?.focus(); }
+function hideWindow(id) { document.getElementById(id+'-window')?.classList.remove('active'); }
+const cmds = { whoami:'CYBERRANGE\\\\blueteam-user', hostname:'WIN-SRV-2025-01', 'Get-Process':'Processes running', baseline:'=== BASELINE ESTABLISHED ===\nWindows Server 2025', 'start-attack':'=== ATTACK STARTED ===\nRDP Brute Force detected' };
+document.getElementById('ps-input')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ const i=document.getElementById('ps-input'),o=document.getElementById('ps-output'),c=i?.value.trim(); if(c&&i&&o){ o.innerHTML+='<p>> '+c+'</p>'; o.innerHTML+='<p>'+(cmds[c]||'Unknown command')+'</p>'; i.value=''; o.scrollTop=o.scrollHeight; } } });
+</script>
+</body></html>`;
+        return new Response(winGuiHtml, {
+          headers: { 'Content-Type': 'text/html;charset=UTF-8' },
+        });
+      }
+      
+      return new Response('Resource not found: ' + resourceName + '\nAvailable resources: cyberforce101.pdf.txt, powershell-reference.txt, windows-server-2025-gui.html', {
         headers: { 'Content-Type': 'text/plain' },
+        status: 404,
       });
     }
 

@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Windows Server 2025 GUI Simulation - Cyberrange</title>
+  <style>
+    :root {
+      --win-bg: #0a0a0a;
+      --win-dark: #1a1a1a;
+      --win-darker: #000000;
+      --win-light: #ffffff;
+      --win-gray: #808080;
+      --win-blue: #0078d4;
+      --win-text: #e0e0e0;
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--win-bg);
+      color: var(--win-light);
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    
+    .desktop {
+      display: grid;
+      grid-template-areas: "taskbar" "desktop";
+      grid-template-rows: auto 1fr;
+      height: 100vh;
+    }
+    
+    .desktop-icons {
+      grid-area: desktop;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, 80px);
+      gap: 20px;
+      align-content: start;
+    }
+    
+    .icon {
+      width: 80px;
+      text-align: center;
+      cursor: pointer;
+    }
+    
+    .icon img {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 4px;
+    }
+    
+    .icon span {
+      font-size: 11px;
+      color: var(--win-text);
+      background: var(--win-bg);
+      padding: 2px;
+      display: block;
+      text-shadow: 1px 1px 2px var(--win-darker);
+    }
+    
+    .window {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px;
+      height: 400px;
+      background: var(--win-dark);
+      border: 1px solid var(--win-gray);
+      border-radius: 4px;
+      box-shadow: 0 0 20px rgba(0, 120, 212, 0.3);
+      display: none;
+    }
+    
+    .window.active {
+      display: block;
+    }
+    
+    .window-header {
+      background: linear-gradient(90deg, var(--win-blue), #005a9e);
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: move;
+    }
+    
+    .window-title {
+      font-size: 12px;
+      color: var(--win-light);
+      font-weight: bold;
+    }
+    
+    .window-controls {
+      display: flex;
+      gap: 4px;
+    }
+    
+    .window-control {
+      width: 24px;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: bold;
+      color: var(--win-light);
+      cursor: pointer;
+    }
+    
+    .window-control.close { background: #ff5f56; }
+    .window-control.min { background: #ffbd2e; }
+    .window-control.max { background: #2dca30; }
+    
+    .window-content {
+      padding: 10px;
+      height: calc(100% - 28px);
+      overflow: auto;
+    }
+    
+    .taskbar {
+      grid-area: taskbar;
+      background: #000000;
+      border-top: 2px solid #404040;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .start-button {
+      background: var(--win-dark);
+      border: 2px solid;
+      border-color: #404040 #ffffff #ffffff #404040;
+      padding: 4px 8px;
+      font-size: 12px;
+      color: var(--win-light);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .taskbar-item {
+      padding: 4px 8px;
+      font-size: 12px;
+      color: var(--win-text);
+      cursor: pointer;
+    }
+    
+    .taskbar-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    
+    .server-info {
+      background: var(--win-dark);
+      border: 1px solid var(--win-gray);
+      padding: 15px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    
+    .server-info h3 {
+      color: var(--win-blue);
+      margin-bottom: 10px;
+    }
+    
+    .event-viewer {
+      background: var(--win-dark);
+      border: 1px solid var(--win-gray);
+      padding: 10px;
+    }
+    
+    .event-viewer table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+    
+    .event-viewer th {
+      background: var(--win-blue);
+      color: var(--win-light);
+      padding: 4px;
+      text-align: left;
+    }
+    
+    .event-viewer td {
+      padding: 3px;
+      border-bottom: 1px solid var(--win-gray);
+    }
+    
+    .event-viewer tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    
+    .command-prompt {
+      background: var(--win-dark);
+      border: 1px solid var(--win-gray);
+      padding: 10px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+    }
+    
+    .command-prompt input {
+      background: transparent;
+      border: none;
+      color: var(--win-light);
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      width: 100%;
+      margin-top: 5px;
+      outline: none;
+    }
+    
+    .command-prompt input:focus {
+      outline: 1px solid var(--win-blue);
+    }
+    
+    .command-output {
+      color: var(--win-text);
+      margin-top: 5px;
+      white-space: pre-wrap;
+    }
+    
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="desktop">
+    <div class="desktop-icons">
+      <div class="icon" onclick="showWindow('server-info')">
+        <div style="width: 48px; height: 48px; background: #0078d4; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 10px;">SRV</div>
+        <span>Server Manager</span>
+      </div>
+      <div class="icon" onclick="showWindow('event-viewer')">
+        <div style="width: 48px; height: 48px; background: #0078d4; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 10px;">EVT</div>
+        <span>Event Viewer</span>
+      </div>
+      <div class="icon" onclick="showWindow('powershell')">
+        <div style="width: 48px; height: 48px; background: #0078d4; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 10px;">PS</div>
+        <span>PowerShell</span>
+      </div>
+      <div class="icon" onclick="showWindow('services')">
+        <div style="width: 48px; height: 48px; background: #0078d4; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 10px;">SVC</div>
+        <span>Services</span>
+      </div>
+    </div>
+    
+    <div class="taskbar">
+      <div class="start-button" onclick="showStartMenu()">
+        <span style="font-weight: bold;">Windows</span>
+      </div>
+      <div class="taskbar-item" onclick="showWindow('powershell')">PowerShell - Terminal</div>
+      <div style="margin-left: auto; padding: 0 10px; font-size: 11px; color: var(--win-text);">Windows Server 2025 • 14:40</div>
+    </div>
+    
+    <!-- Windows -->
+    <div id="server-info-window" class="window">
+      <div class="window-header">
+        <span class="window-title">Server Manager - WIN-SRV-2025-01</span>
+        <div class="window-controls">
+          <div class="window-control min">_</div>
+          <div class="window-control max">□</div>
+          <div class="window-control close" onclick="hideWindow('server-info')">X</div>
+        </div>
+      </div>
+      <div class="window-content">
+        <div class="server-info">
+          <h3>Windows Server 2025 Standard</h3>
+          <p><strong>Computer Name:</strong> WIN-SRV-2025-01</p>
+          <p><strong>Domain:</strong> CYBERRANGE.local</p>
+          <p><strong>IP Address:</strong> 192.168.1.10</p>
+          <p><strong>Processor:</strong> Intel(R) Xeon(R) Platinum 8480+ @ 2.80GHz</p>
+          <p><strong>Installed Memory:</strong> 32.0 GB</p>
+          <p><strong>System Type:</strong> 64-bit Operating System, x64-based processor</p>
+          <p><strong>Last Boot:</strong> 9/23/2026, 13:45:22</p>
+          <p><strong>Uptime:</strong> 1 hour, 23 minutes</p>
+          <p><strong>Running Services:</strong> 45</p>
+          <p><strong>Active Connections:</strong> 12</p>
+        </div>
+      </div>
+    </div>
+    
+    <div id="event-viewer-window" class="window">
+      <div class="window-header">
+        <span class="window-title">Event Viewer - Security Log</span>
+        <div class="window-controls">
+          <div class="window-control min">_</div>
+          <div class="window-control max">□</div>
+          <div class="window-control close" onclick="hideWindow('event-viewer')">X</div>
+        </div>
+      </div>
+      <div class="window-content">
+        <div class="event-viewer">
+          <table>
+            <thead>
+              <tr>
+                <th>Time Created</th>
+                <th>Event ID</th>
+                <th>Level</th>
+                <th>Source</th>
+                <th>Message</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>9/23/2026 2:45:00 PM</td>
+                <td>4624</td>
+                <td>Information</td>
+                <td>Security</td>
+                <td>An account was successfully logged on.</td>
+              </tr>
+              <tr>
+                <td>9/23/2026 2:45:01 PM</td>
+                <td>4624</td>
+                <td>Information</td>
+                <td>Security</td>
+                <td>An account was successfully logged on.</td>
+              </tr>
+              <tr>
+                <td>9/23/2026 2:46:01 PM</td>
+                <td>4625</td>
+                <td>Warning</td>
+                <td>Security</td>
+                <td>An account failed to log on. Account: Administrator, Source: 203.0.113.45</td>
+              </tr>
+              <tr>
+                <td>9/23/2026 2:46:02 PM</td>
+                <td>4625</td>
+                <td>Warning</td>
+                <td>Security</td>
+                <td>An account failed to log on. Account: Administrator, Source: 203.0.113.45</td>
+              </tr>
+              <tr>
+                <td>9/23/2026 2:46:03 PM</td>
+                <td>4625</td>
+                <td>Warning</td>
+                <td>Security</td>
+                <td>An account failed to log on. Account: Administrator, Source: 203.0.113.45</td>
+              </tr>
+              <tr>
+                <td>9/23/2026 2:46:04 PM</td>
+                <td>4625</td>
+                <td>Warning</td>
+                <td>Security</td>
+                <td>An account failed to log on. Account: Administrator, Source: 203.0.113.45</td>
+              </tr>
+              <tr>
+                <td>9/23/2026 2:46:05 PM</td>
+                <td>4625</td>
+                <td>Warning</td>
+                <td>Security</td>
+                <td>An account failed to log on. Account: Administrator, Source: 203.0.113.45</td>
+              </tr>
+            </tbody>
+          </table>
+          <p style="margin-top: 10px; color: #ff5f56; font-weight: bold;">[ALERT] Multiple failed login attempts from 203.0.113.45 - Possible brute force attack!</p>
+        </div>
+      </div>
+    </div>
+    
+    <div id="powershell-window" class="window">
+      <div class="window-header">
+        <span class="window-title">Windows PowerShell - Administrator</span>
+        <div class="window-controls">
+          <div class="window-control min">_</div>
+          <div class="window-control max">□</div>
+          <div class="window-control close" onclick="hideWindow('powershell')">X</div>
+        </div>
+      </div>
+      <div class="window-content">
+        <div class="command-prompt">
+          <p>Windows PowerShell</p>
+          <p>Copyright (C) Microsoft Corporation. All rights reserved.</p>
+          <p></p>
+          <p>PS C:\Users\blueteam-user></p>
+          <div id="ps-output" class="command-output"></div>
+          <input type="text" id="ps-input" placeholder="Type command here..." />
+        </div>
+      </div>
+    </div>
+    
+    <div id="services-window" class="window">
+      <div class="window-header">
+        <span class="window-title">Services - Local Computer</span>
+        <div class="window-controls">
+          <div class="window-control min">_</div>
+          <div class="window-control max">□</div>
+          <div class="window-control close" onclick="hideWindow('services')">X</div>
+        </div>
+      </div>
+      <div class="window-content">
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+          <thead>
+            <tr>
+              <th style="background: #0078d4; color: white; padding: 4px; text-align: left;">Name</th>
+              <th style="background: #0078d4; color: white; padding: 4px; text-align: left;">Display Name</th>
+              <th style="background: #0078d4; color: white; padding: 4px; text-align: left;">Status</th>
+              <th style="background: #0078d4; color: white; padding: 4px; text-align: left;">Start Type</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>WinRM</td>
+              <td>Windows Remote Management</td>
+              <td>Running</td>
+              <td>Automatic</td>
+            </tr>
+            <tr>
+              <td>lanmanserver</td>
+              <td>Server</td>
+              <td>Running</td>
+              <td>Automatic</td>
+            </tr>
+            <tr>
+              <td>Schedule</td>
+              <td>Task Scheduler</td>
+              <td>Running</td>
+              <td>Automatic</td>
+            </tr>
+            <tr>
+              <td>SSHServer</td>
+              <td>OpenSSH Server</td>
+              <td>Running</td>
+              <td>Automatic</td>
+            </tr>
+            <tr>
+              <td>RdpSvc</td>
+              <td>Remote Desktop Services</td>
+              <td>Running</td>
+              <td>Automatic</td>
+            </tr>
+            <tr>
+              <td>Smb</td>
+              <td>Server</td>
+              <td>Running</td>
+              <td>Automatic</td>
+            </tr>
+            <tr>
+              <td>EventLog</td>
+              <td>Windows Event Log</td>
+              <td>Running</td>
+              <td>Automatic</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    function showWindow(windowId) {
+      // Hide all windows
+      document.querySelectorAll('.window').forEach(w => {
+        w.classList.remove('active');
+      });
+      
+      // Show selected window
+      const window = document.getElementById(windowId + '-window');
+      if (window) {
+        window.classList.add('active');
+        
+        // Focus on input if it's the PowerShell window
+        if (windowId === 'powershell') {
+          document.getElementById('ps-input').focus();
+        }
+      }
+    }
+    
+    function hideWindow(windowId) {
+      const window = document.getElementById(windowId + '-window');
+      if (window) {
+        window.classList.remove('active');
+      }
+    }
+    
+    function showStartMenu() {
+      alert('Windows Start Menu - Cyberrange Simulation\n\nAvailable Applications:\n- Server Manager\n- Event Viewer\n- PowerShell\n- Services\n\nThis is a simulated Windows Server 2025 environment for cyber range training.');
+    }
+    
+    // PowerShell commands
+    const psCommands = {
+      'whoami': 'CYBERRANGE\\blueteam-user',
+      'hostname': 'WIN-SRV-2025-01',
+      'Get-Date': new Date().toLocaleString(),
+      'pwd': 'C:\\Users\\blueteam-user',
+      'Get-Process': 'Handles  NPM(K)  PM(K)  WS(K)  CPU(s)  Id  ProcessName\n123      10    5432   16948    2.5  123  System\n456      15   34567   54320   10.2  567  svchost',
+      'Get-Service': 'Status  Name          DisplayName\nRunning WinRM         Windows Remote Management\nRunning lanmanserver  Server\nRunning Schedule      Task Scheduler',
+      'help': 'Available commands:\n- whoami\n- hostname\n- Get-Date\n- pwd\n- Get-Process\n- Get-Service\n- Get-NetTCPConnection\n- Get-WinEvent\n- baseline\n- start-attack\n- shell-type bash|powershell',
+      'baseline': '=== BASELINE ESTABLISHED ===\nWindows Server 2025 Standard\nServices: 45 running\nPorts: 22, 80, 443, 3389\nBaseline saved\nNEXT: Type start-attack to begin',
+      'start-attack': '=== ATTACK STARTED ===\nRDP Brute Force from 203.0.113.45\nMonitor: Get-WinEvent -FilterHashtable @{LogName="Security"}\nMonitor: Get-NetTCPConnection -State Established'
+    };
+    
+    document.getElementById('ps-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        const input = document.getElementById('ps-input');
+        const output = document.getElementById('ps-output');
+        const command = input.value.trim();
+        
+        if (command) {
+          // Show command
+          output.innerHTML += '<p><span style="color: #00ffff;">PS C:\\Users\\blueteam-user> </span>' + command + '</p>';
+          
+          // Process command
+          if (psCommands[command]) {
+            output.innerHTML += '<p>' + psCommands[command].replace(/\n/g, '<br>') + '</p>';
+          } else {
+            output.innerHTML += '<p style="color: #ff5555;">Command not found: ' + command + '</p>';
+          }
+          
+          input.value = '';
+          output.scrollTop = output.scrollHeight;
+        }
+      }
+    });
+    
+    // Make windows draggable
+    document.querySelectorAll('.window-header').forEach(header => {
+      let isDragging = false;
+      let offsetX, offsetY;
+      
+      header.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        const window = header.parentElement;
+        const rect = window.getBoundingClientRect();
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+        e.preventDefault();
+      });
+      
+      document.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+          const window = header.parentElement;
+          window.style.position = 'fixed';
+          window.style.left = (e.clientX - offsetX) + 'px';
+          window.style.top = (e.clientY - offsetY) + 'px';
+          window.style.transform = 'none';
+        }
+      });
+      
+      document.addEventListener('mouseup', () => {
+        isDragging = false;
+      });
+    });
+  </script>
+</body>
+</html>
