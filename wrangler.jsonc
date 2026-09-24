@@ -2,6 +2,8 @@
   "name": "cyberrange",
   "main": "src/index.ts",
   "compatibility_date": "2025-07-18",
+  "account_id": "a6decbdd1f8e524b7f160654bd5b9cbf",
+  "workers_dev": true,
   "observability": {
     "enabled": true
   }
