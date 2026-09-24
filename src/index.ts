@@ -4,6 +4,14 @@
  * Supports bash (Linux) and PowerShell (Windows Server 2025)
  */
 
+import {
+  createBashSession,
+  createDefaultFilesystem,
+  executeBash,
+  formatBashPrompt,
+  type FsNode,
+} from './bashSimulator';
+
 export interface Env {
   CYBERRANGE_ENV?: string;
 }
@@ -28,11 +36,15 @@ interface ShellState {
   shellType: ShellType;
   attackActive: boolean;
   baselineEstablished: boolean;
+  cwd: string;
+  filesystem: FsNode | null;
 }
 
 interface LearningStep {
   label: string;
-  hint: string;
+  why: string;
+  observe: string;
+  action: string;
   accept: string[];
   requireAll?: boolean;
 }
@@ -75,27 +87,8 @@ const esc = (t: string): string => {
     .replace(/'/g, '&#39;');
 };
 
-// Command definitions - will be set per-shell-type in handler
-const COMMANDS: Record<ShellType, Record<string, { output: string; baseline?: boolean; triggersAttack?: boolean }>> = {
-  bash: {
-    'whoami': { output: 'blueteam-user' },
-    'hostname': { output: 'cyberrange-training-01' },
-    'date': { output: new Date().toLocaleString() },
-    'pwd': { output: '/home/blueteam-user' },
-    'ps aux': { output: 'USER   PID %CPU %MEM   VSZ   RSS TTY   STAT\nroot     1  0.0  0.1 16948 3120 ?     Ss\nsshd   123  0.0  0.2 54320 4560 ?     S\nblueteam 1234  0.0  0.3 34567 6789 pts/0 Ss', baseline: true },
-    'netstat -tuln': { output: 'Proto Recv-Q Send-Q Local Address   Foreign Address  State\nTCP    0      0 0.0.0.0:22       0.0.0.0:*        LISTEN\nTCP    0      0 127.0.0.1:3306   0.0.0.0:*        LISTEN', baseline: true },
-    'top': { output: 'Tasks: 123 total, 1 running. %Cpu(s): 2.3us. Mem: 3456MB used', baseline: true },
-    'tail -n 20 /var/log/auth.log': { output: 'Sep 23 19:45 sshd[12345]: Accepted password for blueteam-user from 192.168.1.100\n[NORMAL] No failed attempts', baseline: true },
-    'tail -n 20 /var/log/auth.log attack': { output: 'Sep 23 19:46 sshd[54321]: Failed password for blueteam-user from 203.0.113.45 port 22 ssh2\nSep 23 19:46 sshd[54322]: Failed password for root from 203.0.113.45 port 22 ssh2\nSep 23 19:46 sshd[54323]: Failed password for admin from 203.0.113.45 port 22 ssh2\n[ALERT] Brute force SSH from 203.0.113.45' },
-    'grep Failed /var/log/auth.log': { output: 'No failed logins' },
-    'help': { output: 'Available: whoami, hostname, date, pwd, ps aux, netstat -tuln, top, tail -n 20 /var/log/auth.log, grep Failed /var/log/auth.log, baseline, start-attack, shell-type bash|powershell, lab-info, clear' },
-    'lab-info': { output: 'BLUE TEAM LAB: Network Intrusion\nPhase 1: Run baseline commands\nPhase 2: Type baseline\nPhase 3: Type start-attack\nPhase 4: Detect and respond' },
-    'baseline': { output: '=== BASELINE ESTABLISHED ===\nNormal: 123 processes, ports 22/3306 open\nBaseline saved\nNEXT: Type start-attack to begin', baseline: true },
-    'start-attack': { output: '=== ATTACK STARTED ===\nBrute Force SSH from 203.0.113.45\nMonitor: tail -n 20 /var/log/auth.log\nMonitor: grep Failed /var/log/auth.log', triggersAttack: true },
-    'shell-type bash': { output: 'Switched to bash shell. Use Linux commands.' },
-    'shell-type powershell': { output: 'Switched to PowerShell shell. Use Windows commands.' },
-    'grep Failed /var/log/auth.log attack': { output: 'Sep 23 19:46 sshd[54321]: Failed password for blueteam-user from 203.0.113.45\n[ALERT] Brute Force Attack from 203.0.113.45!' },
-  },
+// PowerShell stays table-driven. Bash uses the stateful Linux simulator.
+const COMMANDS: Record<'powershell', Record<string, { output: string; baseline?: boolean; triggersAttack?: boolean }>> = {
   powershell: {
     'whoami': { output: 'CYBERRANGE\\blueteam-user' },
     'hostname': { output: 'WIN-SRV-2025-01' },
@@ -116,25 +109,117 @@ const COMMANDS: Record<ShellType, Record<string, { output: string; baseline?: bo
   }
 };
 
+const BASH_LAB = {
+  baseline: '=== BASELINE ESTABLISHED ===\nNormal: 123 processes, ports 22/3306 open\nBaseline saved\nNEXT: Type start-attack to begin',
+  'start-attack': '=== ATTACK STARTED ===\nBrute Force SSH from 203.0.113.45\nMonitor: tail -n 20 /var/log/auth.log\nMonitor: grep Failed /var/log/auth.log',
+  'lab-info': 'BLUE TEAM LAB: Network Intrusion\nPhase 1: Run baseline commands\nPhase 2: Type baseline\nPhase 3: Type start-attack\nPhase 4: Detect and respond',
+};
+
 // Learning steps per shell type. `accept` is the exact command that completes the step.
 const LEARNING_STEPS: Record<ShellType, LearningStep[]> = {
   bash: [
-    { label: 'Identify the host', hint: 'Run: hostname, whoami, and date', accept: ['hostname', 'whoami', 'date'], requireAll: true },
-    { label: 'Check processes', hint: 'Run: ps aux', accept: ['ps aux'] },
-    { label: 'Check listening ports', hint: 'Run: netstat -tuln', accept: ['netstat -tuln'] },
-    { label: 'Check resources', hint: 'Run: top', accept: ['top'] },
-    { label: 'Read authentication logs', hint: 'Run: tail -n 20 /var/log/auth.log', accept: ['tail -n 20 /var/log/auth.log'] },
-    { label: 'Save the baseline', hint: 'Type: baseline', accept: ['baseline'] },
-    { label: 'Start the attack', hint: 'Type: start-attack', accept: ['start-attack'] },
+    {
+      label: 'Identify the host',
+      why: 'Before you hunt for attacks, lock down who and what you are investigating. Hostname, user, and clock give you context for every log line that follows. If the time is wrong, failed-login timestamps will look misleading.',
+      observe: 'Note the hostname, your username, and the current time. You will compare later log timestamps against this clock.',
+      action: 'Run: hostname, whoami, and date',
+      accept: ['hostname', 'whoami', 'date'],
+      requireAll: true,
+    },
+    {
+      label: 'Check processes',
+      why: 'A process list is your first picture of normal system activity. Blue teams capture this before an incident so they can spot unfamiliar binaries, unexpected root services, or odd CPU consumers later.',
+      observe: 'Write down long-running services you expect on a Linux training host (sshd, mysqld, systemd). Flag anything that looks unfamiliar.',
+      action: 'Run: ps aux',
+      accept: ['ps aux'],
+    },
+    {
+      label: 'Check listening ports',
+      why: 'Listening ports show what the host is advertising to the network. Unexpected listeners are a common first sign of malware, misconfiguration, or an exposed service an attacker can probe.',
+      observe: 'Record which ports are listening (expect SSH on 22 and MySQL on 3306 here). Note whether they bind to localhost only or to all interfaces.',
+      action: 'Run: netstat -tuln',
+      accept: ['netstat -tuln'],
+    },
+    {
+      label: 'Check resources',
+      why: 'CPU and memory baselines help you separate a noisy brute-force flood from an otherwise healthy box. Spikes without a matching business workload are worth investigating.',
+      observe: 'Capture a snapshot of load, memory use, and top processes. This is your “quiet host” reference.',
+      action: 'Run: top',
+      accept: ['top'],
+    },
+    {
+      label: 'Read authentication logs',
+      why: 'SSH authentication events live in /var/log/auth.log. Reading them now, while traffic is normal, teaches you what a healthy login pattern looks like so failed attempts stand out later.',
+      observe: 'Confirm successful logins and the absence of repeated Failed password lines. Save a short note that the log looks quiet.',
+      action: 'Run: tail -n 20 /var/log/auth.log',
+      accept: ['tail -n 20 /var/log/auth.log'],
+    },
+    {
+      label: 'Save the baseline',
+      why: 'A baseline freezes the known-good state. In real IR you cannot always roll the clock back, so documenting normal activity before the alert is standard blue-team practice.',
+      observe: 'Summarize process count, open ports, and auth-log status in the observation notepad. Then lock it in with the baseline command.',
+      action: 'Type: baseline',
+      accept: ['baseline'],
+    },
+    {
+      label: 'Start the attack',
+      why: 'The lab injects a simulated SSH brute-force from 203.0.113.45. Starting it only after the baseline mirrors how defenders compare pre-incident evidence with live alerts.',
+      observe: 'After the attack starts, re-check auth.log and look for Failed password lines from 203.0.113.45. Note the source IP, target accounts, and how the pattern differs from your baseline.',
+      action: 'Type: start-attack',
+      accept: ['start-attack'],
+    },
   ],
   powershell: [
-    { label: 'Identify the host', hint: 'Run: hostname, whoami, and Get-Date', accept: ['hostname', 'whoami', 'Get-Date'], requireAll: true },
-    { label: 'Check processes', hint: 'Run: Get-Process', accept: ['Get-Process'] },
-    { label: 'Check listening ports', hint: 'Run: Get-NetTCPConnection -State Listen', accept: ['Get-NetTCPConnection -State Listen'] },
-    { label: 'Check running services', hint: 'Run: Get-Service | Where-Object { $_.Status -eq "Running" }', accept: ['Get-Service | Where-Object { $_.Status -eq "Running" }'] },
-    { label: 'Read the security log', hint: 'Run: Get-WinEvent -LogName Security -MaxEvents 5', accept: ['Get-WinEvent -LogName Security -MaxEvents 5'] },
-    { label: 'Save the baseline', hint: 'Type: baseline', accept: ['baseline'] },
-    { label: 'Start the attack', hint: 'Type: start-attack', accept: ['start-attack'] },
+    {
+      label: 'Identify the host',
+      why: 'On Windows, the computer name, signed-in user, and clock are the anchors for Security event log review. Wrong host identity wastes time during escalation.',
+      observe: 'Record computer name, user, and local time before you touch Event Viewer data.',
+      action: 'Run: hostname, whoami, and Get-Date',
+      accept: ['hostname', 'whoami', 'Get-Date'],
+      requireAll: true,
+    },
+    {
+      label: 'Check processes',
+      why: 'Get-Process shows what is running right now. Baseline process lists make it easier to spot ransomware staging, unexpected PowerShell hosts, or odd services later.',
+      observe: 'Note common Windows processes (System, svchost). Call out anything that looks unusual for a hardened server.',
+      action: 'Run: Get-Process',
+      accept: ['Get-Process'],
+    },
+    {
+      label: 'Check listening ports',
+      why: 'Listening TCP ports reveal remote management and published services. RDP (3389) and web ports are high-value targets for brute force and scanning.',
+      observe: 'List listening ports and whether RDP/web services are exposed. This becomes your network baseline.',
+      action: 'Run: Get-NetTCPConnection -State Listen',
+      accept: ['Get-NetTCPConnection -State Listen'],
+    },
+    {
+      label: 'Check running services',
+      why: 'Services define the long-lived attack surface. Unexpected auto-start services often survive reboots and are a favorite persistence mechanism.',
+      observe: 'Document running services such as WinRM and Server. Note anything you would not expect on a locked-down Windows Server.',
+      action: 'Run: Get-Service | Where-Object { $_.Status -eq "Running" }',
+      accept: ['Get-Service | Where-Object { $_.Status -eq "Running" }'],
+    },
+    {
+      label: 'Read the security log',
+      why: 'Windows Security events (especially 4624 success and 4625 failure) are the primary source for login investigations. Reading a quiet log first trains your eye.',
+      observe: 'Confirm normal successful logons and no burst of failures. Write that the Security log currently looks clean.',
+      action: 'Run: Get-WinEvent -LogName Security -MaxEvents 5',
+      accept: ['Get-WinEvent -LogName Security -MaxEvents 5'],
+    },
+    {
+      label: 'Save the baseline',
+      why: 'Saving the baseline marks the known-good Windows state before the lab injects hostile activity.',
+      observe: 'Summarize services, ports, and quiet Security events in the observation notepad, then save the baseline.',
+      action: 'Type: baseline',
+      accept: ['baseline'],
+    },
+    {
+      label: 'Start the attack',
+      why: 'The lab starts a simulated RDP brute-force from 203.0.113.45. Afterward, failed logons should appear in Security events for you to detect and document.',
+      observe: 'Re-check Security events for failed logons from 203.0.113.45. Note event IDs, source IP, and how the noise compares with your baseline.',
+      action: 'Type: start-attack',
+      accept: ['start-attack'],
+    },
   ],
 };
 
@@ -153,11 +238,10 @@ const parseMode = (value: string | null | undefined): ShellMode =>
 const normalizeCommand = (command: string): string => command.trim().replace(/\s+/g, ' ');
 
 const lookupCommand = (
-  shellType: ShellType,
   command: string,
   attackActive: boolean,
 ): { output: string } | null => {
-  const commands = COMMANDS[shellType];
+  const commands = COMMANDS.powershell;
   const attackKey = `${command} attack`;
   if (attackActive && Object.prototype.hasOwnProperty.call(commands, attackKey)) {
     return commands[attackKey];
@@ -176,6 +260,8 @@ interface ExecInput {
   attackActive?: boolean;
   baselineEstablished?: boolean;
   commandHistory?: unknown;
+  cwd?: string;
+  filesystem?: unknown;
 }
 
 interface ExecResult {
@@ -189,6 +275,10 @@ interface ExecResult {
   attackActive: boolean;
   baselineEstablished: boolean;
   stepChanged: boolean;
+  cwd: string;
+  filesystem: FsNode | null;
+  prompt: string;
+  clear?: boolean;
 }
 
 const executeCommand = (body: ExecInput): ExecResult => {
@@ -210,19 +300,22 @@ const executeCommand = (body: ExecInput): ExecResult => {
     shellType,
     attackActive: body.attackActive === true,
     baselineEstablished: body.baselineEstablished === true,
+    cwd: typeof body.cwd === 'string' ? body.cwd : '/home/blueteam-user',
+    filesystem: null,
   };
 
   let output: string | null = null;
   let error: string | null = null;
   let stepChanged = false;
   let progressNote: string | null = null;
+  let clear = false;
 
   if (cmd === 'baseline') {
-    output = COMMANDS[shellType].baseline.output;
+    output = shellType === 'bash' ? BASH_LAB.baseline : COMMANDS.powershell.baseline.output;
     state.baselineEstablished = true;
   } else if (cmd === 'start-attack') {
     if (state.baselineEstablished) {
-      output = COMMANDS[shellType]['start-attack'].output;
+      output = shellType === 'bash' ? BASH_LAB['start-attack'] : COMMANDS.powershell['start-attack'].output;
       state.attackActive = true;
     } else {
       error = 'Cannot start attack: Baseline not established. Type "baseline" first.';
@@ -232,13 +325,36 @@ const executeCommand = (body: ExecInput): ExecResult => {
     if (newType === 'bash' || newType === 'powershell') {
       state.shellType = newType;
       output = `Shell switched to ${newType}. Use ${newType} commands.`;
+      if (newType === 'bash') {
+        state.cwd = '/home/blueteam-user';
+        state.filesystem = null;
+      }
     } else {
       error = `Unknown shell type: ${newType}. Use 'bash' or 'powershell'.`;
     }
+  } else if (cmd === 'lab-info') {
+    output = shellType === 'bash' ? BASH_LAB['lab-info'] : COMMANDS.powershell['lab-info'].output;
+  } else if (shellType === 'bash') {
+    const session = createBashSession({
+      cwd: body.cwd,
+      filesystem: body.filesystem,
+      history,
+      attackActive: state.attackActive,
+    });
+    const result = executeBash(session, cmd, { attackActive: state.attackActive });
+    output = result.output || null;
+    error = result.error;
+    state.cwd = result.cwd;
+    state.filesystem = result.filesystem;
+    clear = result.clear === true;
+    if (clear) {
+      output = null;
+      error = null;
+    }
   } else {
-    const entry = lookupCommand(shellType, cmd, state.attackActive);
+    const entry = lookupCommand(cmd, state.attackActive);
     if (entry) {
-      output = cmd === 'date' || cmd === 'Get-Date' ? new Date().toLocaleString() : entry.output;
+      output = cmd === 'Get-Date' ? new Date().toLocaleString() : entry.output;
     } else {
       error = `Command not found: ${cmd}. Type 'help' for available commands.`;
     }
@@ -264,6 +380,11 @@ const executeCommand = (body: ExecInput): ExecResult => {
     state.commandHistory = [...history, cmd].slice(-200);
   }
 
+  const prompt =
+    state.shellType === 'powershell'
+      ? getShellPrompt('powershell')
+      : formatBashPrompt(state.cwd);
+
   return {
     output,
     error,
@@ -275,6 +396,10 @@ const executeCommand = (body: ExecInput): ExecResult => {
     attackActive: state.attackActive,
     baselineEstablished: state.baselineEstablished,
     stepChanged,
+    cwd: state.cwd,
+    filesystem: state.shellType === 'bash' ? state.filesystem : null,
+    prompt,
+    clear,
   };
 };
 
@@ -309,18 +434,18 @@ body { font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;
 .lil { color: var(--text); overflow-wrap: anywhere; word-break: break-word; margin: 0; font-size: 13px; font-weight: 600; line-height: 1.35; }
 `;
 
-const getShellPrompt = (shellType: ShellType): string => {
+const getShellPrompt = (shellType: ShellType, cwd = '/home/blueteam-user'): string => {
   if (shellType === 'powershell') {
     return 'PS C:\\Users\\blueteam-user>';
   }
-  return 'blueteam@cyberrange:~$';
+  return formatBashPrompt(cwd);
 };
 
 const getWelcomeMessage = (shellType: ShellType): string => {
   if (shellType === 'powershell') {
     return 'Windows Server 2025 PowerShell Terminal. Type help for commands.';
   }
-  return 'Linux Terminal. Type help for commands.';
+  return 'Linux Terminal. Type help, then try ls, cd, pwd, and cat.';
 };
 
 const labsIndexHTML = (): string => {
@@ -371,6 +496,8 @@ const BOOT = ${JSON.stringify({
   shellType: state.shellType,
   attackActive: state.attackActive,
   baselineEstablished: state.baselineEstablished,
+  cwd: state.cwd || '/home/blueteam-user',
+  filesystem: state.shellType === 'bash' ? (state.filesystem || createDefaultFilesystem(state.attackActive)) : null,
 })};
 const STEPS = ${JSON.stringify(LEARNING_STEPS)};
 const PROMPTS = ${JSON.stringify({
@@ -391,7 +518,21 @@ let m = BOOT.mode;
 let st = BOOT.shellType;
 let a = BOOT.attackActive;
 let b = BOOT.baselineEstablished;
+let cwd = BOOT.cwd || '/home/blueteam-user';
+let filesystem = BOOT.filesystem || null;
 let browse = -1;
+let draft = '';
+
+const BASH_COMMANDS = [
+  'help','pwd','cd','ls','cat','less','more','head','tail','mkdir','touch','rm','rmdir','cp','mv',
+  'echo','grep','find','tree','wc','sort','clear','history','whoami','id','hostname','date','uname',
+  'env','printenv','df','free','uptime','ps','top','netstat','ss','ifconfig','ip','ping','which',
+  'file','chmod','chown','man','baseline','start-attack','lab-info','shell-type'
+];
+const POWERSHELL_COMMANDS = [
+  'whoami','hostname','Get-Date','pwd','Get-Process','Get-NetTCPConnection','Get-Service','Get-WinEvent',
+  'baseline','start-attack','lab-info','shell-type','help','Clear-Host','cls'
+];
 
 function storageKey() {
   return 'cyberrange-session-' + lid;
@@ -407,6 +548,7 @@ function readStore() {
 
 function saveSession() {
   try {
+    const notesEl = document.getElementById('obs-notes');
     localStorage.setItem(storageKey(), JSON.stringify({
       transcript: transcript,
       commandHistory: h,
@@ -415,8 +557,19 @@ function saveSession() {
       shellType: st,
       attackActive: a,
       baselineEstablished: b,
+      cwd: cwd,
+      filesystem: filesystem,
+      observations: notesEl ? notesEl.value : (window.__obsNotes || ''),
     }));
   } catch (err) {}
+}
+
+function loadObservations(stored) {
+  const notesEl = document.getElementById('obs-notes');
+  if (!notesEl) return;
+  const text = stored && typeof stored.observations === 'string' ? stored.observations : '';
+  notesEl.value = text;
+  window.__obsNotes = text;
 }
 
 function labQuery() {
@@ -431,12 +584,153 @@ function syncUrl() {
   history.replaceState(null, '', '/labs/' + lid + labQuery());
 }
 
+function formatBashPrompt(path) {
+  const home = '/home/blueteam-user';
+  let shown = path || home;
+  if (shown === home) shown = '~';
+  else if (shown.indexOf(home + '/') === 0) shown = '~' + shown.slice(home.length);
+  return 'blueteam-user@cyberrange:' + shown + '$';
+}
+
 function promptText() {
-  return PROMPTS[st] || PROMPTS.bash;
+  if (st === 'powershell') return PROMPTS.powershell;
+  return formatBashPrompt(cwd);
 }
 
 function normalize(command) {
   return String(command || '').trim().replace(/\s+/g, ' ');
+}
+
+function setInputValue(input, value) {
+  input.value = value;
+  const end = value.length;
+  if (typeof input.setSelectionRange === 'function') {
+    input.setSelectionRange(end, end);
+  }
+}
+
+function commonPrefix(items) {
+  if (!items.length) return '';
+  let prefix = items[0];
+  for (let i = 1; i < items.length; i++) {
+    while (items[i].indexOf(prefix) !== 0) {
+      prefix = prefix.slice(0, -1);
+      if (!prefix) return '';
+    }
+  }
+  return prefix;
+}
+
+function normalizeFsPath(path) {
+  const parts = String(path || '/').split('/').filter(function (part) { return part && part !== '.'; });
+  const stack = [];
+  for (let i = 0; i < parts.length; i++) {
+    if (parts[i] === '..') stack.pop();
+    else stack.push(parts[i]);
+  }
+  return '/' + stack.join('/');
+}
+
+function expandFsPath(base, target) {
+  let path = String(target || '.');
+  const home = '/home/blueteam-user';
+  if (path === '~' || path.indexOf('~/') === 0) path = home + path.slice(1);
+  if (path.charAt(0) !== '/') path = (base === '/' ? '/' : base + '/') + path;
+  return normalizeFsPath(path);
+}
+
+function getFsNode(root, absolutePath) {
+  if (!root) return null;
+  const path = normalizeFsPath(absolutePath);
+  if (path === '/') return root;
+  let current = root;
+  const parts = path.split('/').filter(Boolean);
+  for (let i = 0; i < parts.length; i++) {
+    if (!current || current.type !== 'dir' || !current.children || !Object.prototype.hasOwnProperty.call(current.children, parts[i])) {
+      return null;
+    }
+    current = current.children[parts[i]];
+  }
+  return current;
+}
+
+function listFsNames(absoluteDir) {
+  const node = getFsNode(filesystem, absoluteDir);
+  if (!node || node.type !== 'dir' || !node.children) return [];
+  return Object.keys(node.children).sort();
+}
+
+function commandSuggestions() {
+  return st === 'powershell' ? POWERSHELL_COMMANDS.slice() : BASH_COMMANDS.slice();
+}
+
+function pathSuggestions(token) {
+  if (!filesystem) return [];
+  const home = '/home/blueteam-user';
+  let raw = token || '';
+  let dirname = '';
+  let partial = raw;
+  const slash = raw.lastIndexOf('/');
+  if (slash >= 0) {
+    dirname = raw.slice(0, slash + 1);
+    partial = raw.slice(slash + 1);
+  }
+
+  let searchDir;
+  if (!dirname) {
+    searchDir = cwd;
+  } else if (dirname === '~/') {
+    searchDir = home;
+  } else if (dirname.indexOf('~/') === 0) {
+    searchDir = expandFsPath(cwd, dirname.slice(0, -1) || '~');
+  } else {
+    searchDir = expandFsPath(cwd, dirname.slice(0, -1) || (dirname.charAt(0) === '/' ? '/' : '.'));
+  }
+
+  return listFsNames(searchDir)
+    .filter(function (name) { return name.indexOf(partial) === 0; })
+    .map(function (name) {
+      const node = getFsNode(filesystem, normalizeFsPath(searchDir + '/' + name));
+      const suffix = node && node.type === 'dir' ? '/' : '';
+      return dirname + name + suffix;
+    });
+}
+
+function autocomplete(input) {
+  const value = input.value;
+  const cursor = typeof input.selectionStart === 'number' ? input.selectionStart : value.length;
+  const before = value.slice(0, cursor);
+  const after = value.slice(cursor);
+  const match = before.match(/^(.*?)(\S*)$/);
+  if (!match) return;
+  const prefix = match[1];
+  const token = match[2];
+  const isFirst = !prefix.trim();
+
+  let matches = [];
+  if (isFirst) {
+    matches = commandSuggestions().filter(function (cmd) { return cmd.indexOf(token) === 0; });
+  } else if (st === 'bash') {
+    matches = pathSuggestions(token);
+  } else {
+    matches = commandSuggestions().filter(function (cmd) { return cmd.indexOf(token) === 0; });
+  }
+
+  if (!matches.length) return;
+
+  if (matches.length === 1) {
+    setInputValue(input, prefix + matches[0] + after);
+    return;
+  }
+
+  const shared = commonPrefix(matches);
+  if (shared && shared.length > token.length) {
+    setInputValue(input, prefix + shared + after);
+    return;
+  }
+
+  addBlock(matches.join('  '), '#7a8a99');
+  o.scrollTop = o.scrollHeight;
 }
 
 function statusHtml() {
@@ -452,7 +746,9 @@ function updateSidebar() {
   const view = steps[Math.min(s, total - 1)];
   const count = document.getElementById('step-count');
   const title = document.getElementById('step-title');
-  const hint = document.getElementById('step-hint');
+  const why = document.getElementById('step-why');
+  const observe = document.getElementById('step-observe');
+  const action = document.getElementById('step-action');
   const fill = document.getElementById('progress-fill');
   const slot = document.getElementById('status-slot');
   const prev = document.getElementById('prev');
@@ -460,18 +756,34 @@ function updateSidebar() {
   const term = document.getElementById('term-label');
   if (kicker) kicker.textContent = m === 'free' ? 'Free Mode' : 'Learning Mode';
   if (term) term.textContent = 'Terminal (' + st + ')';
+
+  const freeWhy = 'Free mode is open practice on the same simulated host. Use it to explore the filesystem, re-run detections, or try commands outside the guided path.';
+  const freeObserve = 'Write anything useful you notice: paths, ports, log lines, or attack indicators.';
+  const freeAction = 'Type help for the command list. Arrow keys recall history; Tab completes commands and paths.';
+  const doneWhy = 'You finished the guided path. The host should now show attack evidence that did not exist in your baseline.';
+  const doneObserve = 'Confirm the difference between baseline and attack views in your notepad: source IP, failed logins, and which commands revealed them.';
+  const doneAction = st === 'powershell'
+    ? 'Re-check with Get-WinEvent and document your findings.'
+    : 'Re-check with tail / grep / cat on /var/log/auth.log and document your findings.';
+
   if (m === 'free') {
     if (count) count.textContent = 'Free mode';
-    if (title) title.textContent = 'Free practice';
-    if (hint) hint.textContent = 'Any lab command works. Type help for the list.';
+    if (title) title.textContent = 'Open investigation';
+    if (why) why.textContent = freeWhy;
+    if (observe) observe.textContent = freeObserve;
+    if (action) action.textContent = freeAction;
   } else if (done) {
     if (count) count.textContent = 'Lab complete';
-    if (title) title.textContent = 'Lab complete';
-    if (hint) hint.textContent = 'Monitor the logs and respond. Type help to list commands.';
+    if (title) title.textContent = 'Detect and document';
+    if (why) why.textContent = doneWhy;
+    if (observe) observe.textContent = doneObserve;
+    if (action) action.textContent = doneAction;
   } else {
     if (count) count.textContent = 'Step ' + (s + 1) + ' of ' + total;
     if (title) title.textContent = 'Step ' + (s + 1) + ': ' + view.label;
-    if (hint) hint.textContent = view.hint;
+    if (why) why.textContent = view.why;
+    if (observe) observe.textContent = view.observe;
+    if (action) action.textContent = view.action;
   }
   if (fill) fill.style.width = (done || m === 'free' ? 100 : Math.round((s / total) * 100)) + '%';
   if (slot) slot.innerHTML = statusHtml();
@@ -511,7 +823,7 @@ function paintEntry(entry) {
   const line = document.createElement('div');
   const pr = document.createElement('span');
   pr.className = 'pr';
-  pr.textContent = promptText();
+  pr.textContent = entry.prompt || promptText();
   const cmd = document.createElement('span');
   cmd.textContent = ' ' + entry.command;
   line.appendChild(pr);
@@ -566,19 +878,12 @@ async function exec(input) {
   input.disabled = true;
   browse = -1;
 
-  if (c === 'clear' || c === 'cls' || c === 'Clear-Host') {
-    transcript = [];
-    h = [];
-    saveSession();
-    paint();
-    return;
-  }
-
+  const usedPrompt = promptText();
   const line = input.parentElement;
   line.textContent = '';
   const pr = document.createElement('span');
   pr.className = 'pr';
-  pr.textContent = promptText();
+  pr.textContent = usedPrompt;
   const cmd = document.createElement('span');
   cmd.textContent = ' ' + c;
   line.appendChild(pr);
@@ -597,6 +902,8 @@ async function exec(input) {
         attackActive: a,
         baselineEstablished: b,
         commandHistory: h,
+        cwd: cwd,
+        filesystem: filesystem,
       }),
     });
     data = await r.json();
@@ -611,12 +918,23 @@ async function exec(input) {
     return;
   }
 
+  if (data.clear) {
+    transcript = [];
+    h = [];
+    if (typeof data.cwd === 'string') cwd = data.cwd;
+    if (data.filesystem) filesystem = data.filesystem;
+    saveSession();
+    paint();
+    return;
+  }
+
   addBlock(data.output, '');
   addBlock(data.progressNote, '#fbbf24');
   addBlock(data.error, '#ff5555');
 
   transcript.push({
     command: c,
+    prompt: usedPrompt,
     output: data.output || '',
     error: data.error || '',
     note: data.progressNote || '',
@@ -629,10 +947,14 @@ async function exec(input) {
   const nextShell = data.shellType || st;
   a = data.attackActive === true;
   b = data.baselineEstablished === true;
+  if (typeof data.cwd === 'string') cwd = data.cwd;
+  if (data.filesystem) filesystem = data.filesystem;
   saveSession();
 
   if (nextShell !== st) {
     st = nextShell;
+    filesystem = null;
+    cwd = '/home/blueteam-user';
     saveSession();
     window.location.href = '/labs/' + lid + labQuery();
     return;
@@ -654,6 +976,7 @@ function boot() {
     if (typeof stored.step === 'number') s = stored.step;
     if (typeof stored.attackActive === 'boolean') a = stored.attackActive;
     if (typeof stored.baselineEstablished === 'boolean') b = stored.baselineEstablished;
+    if (typeof stored.cwd === 'string') cwd = stored.cwd;
     const drift = st !== BOOT.shellType || m !== BOOT.mode || s !== BOOT.step || a !== BOOT.attackActive || b !== BOOT.baselineEstablished;
     if (drift) {
       window.location.replace('/labs/' + lid + labQuery());
@@ -670,15 +993,25 @@ function boot() {
       transcript = stored.commandHistory.filter(function (command) {
         return typeof command === 'string';
       }).map(function (command) {
-        return { command: command, output: '', error: '', note: '' };
+        return { command: command, output: '', error: '', note: '', prompt: '' };
       });
     }
     h = transcript.map(function (entry) { return entry.command; });
+    if (typeof stored.cwd === 'string') cwd = stored.cwd;
+    if (stored.filesystem) filesystem = stored.filesystem;
   }
 
   updateSidebar();
   paint();
   syncUrl();
+  loadObservations(stored);
+  const notesEl = document.getElementById('obs-notes');
+  if (notesEl) {
+    notesEl.addEventListener('input', function () {
+      window.__obsNotes = notesEl.value;
+      saveSession();
+    });
+  }
 }
 
 if (o) {
@@ -695,28 +1028,46 @@ if (o) {
       transcript = [];
       h = [];
       browse = -1;
+      draft = '';
       saveSession();
       paint();
       return;
     }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      autocomplete(input);
+      return;
+    }
     if (e.key === 'Enter') {
       e.preventDefault();
+      draft = '';
+      browse = -1;
       exec(input);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       if (!h.length) return;
-      if (browse < 0) browse = h.length;
+      if (browse < 0) {
+        draft = input.value;
+        browse = h.length;
+      }
       if (browse > 0) browse -= 1;
-      input.value = h[browse];
+      setInputValue(input, h[browse] || '');
     } else if (e.key === 'ArrowDown') {
       if (browse < 0) return;
       e.preventDefault();
       browse += 1;
       if (browse >= h.length) {
         browse = -1;
-        input.value = '';
+        setInputValue(input, draft);
+        draft = '';
       } else {
-        input.value = h[browse];
+        setInputValue(input, h[browse] || '');
+      }
+    } else if (browse >= 0 && e.key !== 'Shift' && e.key !== 'Control' && e.key !== 'Alt' && e.key !== 'Meta') {
+      // Leave history browse mode once the user edits the recalled command.
+      if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+        browse = -1;
+        draft = '';
       }
     }
   });
@@ -746,14 +1097,19 @@ const shellHTML = (lab: Lab, state: ShellState): string => {
 <html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>${lab.title}</title><style>
 ${baseStyles}
-.lab { display: grid; grid-template-columns: 280px 1fr; gap: 20px; }
-.sidebar { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; }
+.lab { display: grid; grid-template-columns: 340px 1fr; gap: 20px; }
+.sidebar { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; max-height: calc(100vh - 140px); overflow-y: auto; }
 .pb { height: 4px; background: var(--bg3); border-radius: 2px; overflow: hidden; margin-bottom: 8px; }
 .pf { height: 100%; background: linear-gradient(90deg,var(--accent),var(--good)); width: 0; transition: width .3s; }
-@media (max-width: 800px) { .lab { grid-template-columns: 1fr; } }
+@media (max-width: 800px) { .lab { grid-template-columns: 1fr; } .sidebar { max-height: none; } }
 .cs { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r2); padding: 12px; margin-top: 12px; }
-.cst { font-size: 13px; font-weight: 700; color: var(--accent); margin: 0 0 4px; }
-.csi { font-size: 12px; color: var(--text2); line-height: 1.45; margin: 0; }
+.cst { font-size: 13px; font-weight: 700; color: var(--accent); margin: 0 0 8px; }
+.csi { font-size: 12px; color: var(--text2); line-height: 1.5; margin: 0 0 10px; }
+.cs-label { letter-spacing: .08em; text-transform: uppercase; color: var(--text3); font-size: 10px; font-weight: 700; margin: 0 0 4px; }
+.cs-action { font-family: Consolas,monospace; font-size: 12px; color: var(--good); background: rgba(74,222,128,.08); border: 1px solid rgba(74,222,128,.25); border-radius: var(--r2); padding: 8px 10px; margin: 0; line-height: 1.4; }
+.obs { margin-top: 12px; }
+.obs-box { width: 100%; min-height: 140px; resize: vertical; background: #0a0a0a; color: var(--text); border: 1px solid var(--border); border-radius: var(--r2); padding: 10px; font-family: Consolas,monospace; font-size: 12px; line-height: 1.45; }
+.obs-box:focus { outline: 1px solid var(--accent); }
 .shell { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; display: flex; flex-direction: column; min-height: 500px; }
 .sh { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 8px; }
 .st2 { font-size: 14px; font-weight: 600; color: var(--text); }
@@ -782,8 +1138,28 @@ ${baseStyles}
 <p class="kicker" id="mode-kicker">${state.mode === 'free' ? 'Free Mode' : 'Learning Mode'}</p><h3 style="margin:6px 0 2px;font-size:14px;font-weight:700">Progress</h3>
 <div style="margin-bottom:12px"><div class="pb"><div class="pf" id="progress-fill" style="width:${progress}%"></div></div>
 <p id="step-count" style="font-size:11px;color:var(--text3)">${done ? 'Lab complete' : `Step ${step + 1} of ${totalSteps}`}</p></div>
-<div class="cs"><p class="cst" id="step-title">${done ? 'Lab complete' : `Step ${step + 1}: ${esc(view.label)}`}</p>
-<p class="csi" id="step-hint">${done ? 'Monitor the logs and respond. Type help to list commands.' : esc(view.hint)}</p></div>
+<div class="cs">
+<p class="cst" id="step-title">${done ? 'Detect and document' : `Step ${step + 1}: ${esc(view.label)}`}</p>
+<p class="cs-label">Why this matters</p>
+<p class="csi" id="step-why">${done
+  ? 'You finished the guided path. The host should now show attack evidence that did not exist in your baseline.'
+  : esc(view.why)}</p>
+<p class="cs-label">What to observe</p>
+<p class="csi" id="step-observe">${done
+  ? 'Confirm the difference between baseline and attack views in your notepad: source IP, failed logins, and which commands revealed them.'
+  : esc(view.observe)}</p>
+<p class="cs-label">What to run</p>
+<p class="cs-action" id="step-action">${done
+  ? (shellType === 'powershell'
+    ? 'Re-check with Get-WinEvent and document your findings.'
+    : 'Re-check with tail / grep / cat on /var/log/auth.log and document your findings.')
+  : esc(view.action)}</p>
+</div>
+<div class="obs">
+<p class="cs-label">Observation notepad</p>
+<p class="csi" style="margin-bottom:8px">Use this pad for host facts, baseline notes, and attack indicators as you work. It saves with your session.</p>
+<textarea id="obs-notes" class="obs-box" placeholder="Hostname:&#10;User:&#10;Listening ports:&#10;Baseline notes:&#10;Attack indicators:"></textarea>
+</div>
 <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
 <span id="status-slot">${attackActive ? '<span class="sb sb-a">ATTACK ACTIVE</span>' : baselineEstablished ? '<span class="sb sb-b">BASELINE OK</span>' : '<span class="tag">Establish Baseline</span>'}</span>
 <span class="tag">${esc(lab.difficulty)}</span>
@@ -919,6 +1295,8 @@ export default {
         shellType,
         attackActive,
         baselineEstablished,
+        cwd: '/home/blueteam-user',
+        filesystem: null,
       };
 
       return new Response(shellHTML(lab, state), {

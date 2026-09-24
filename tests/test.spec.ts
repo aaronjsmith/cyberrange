@@ -68,6 +68,10 @@ describe('Cyberrange Worker', () => {
       expect(html).toContain('Network Intrusion Detection');
       expect(html).toContain('Terminal');
       expect(html).toContain('Run: hostname, whoami, and date');
+      expect(html).toContain('Why this matters');
+      expect(html).toContain('What to observe');
+      expect(html).toContain('Observation notepad');
+      expect(html).toContain('Before you hunt for attacks');
       expect(html).not.toContain('contenteditable');
       expect(html).not.toContain('location.reload');
       expect(html).not.toContain('[object Object]');
@@ -75,7 +79,10 @@ describe('Cyberrange Worker', () => {
       const script = html.match(/<script>\n([\s\S]*?)<\/script>/);
       expect(script).toBeTruthy();
       expect(script?.[1]).toContain('replace(/\\s+/g, \' \')');
-      expect(script?.[1]).toContain('blueteam@cyberrange:~$');
+      expect(script?.[1]).toContain('blueteam-user@cyberrange:');
+      expect(script?.[1]).toContain("e.key === 'Tab'");
+      expect(script?.[1]).toContain("e.key === 'ArrowUp'");
+      expect(script?.[1]).toContain('function autocomplete');
       expect(() => new Function(script?.[1] || '')).not.toThrow();
     });
 
@@ -200,6 +207,23 @@ describe('Cyberrange Worker', () => {
       expect(json.attackActive).toBe(true);
     });
 
+    it('should render realistic top metrics for a quiet Linux host', async () => {
+      const response = await mockFetch(new Request('http://localhost:8787/api/labs/network-intrusion-baseline/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: 'top', shellType: 'bash', attackActive: false }),
+      }), {});
+      const json = await response.json();
+
+      expect(json.output).toContain('load average:');
+      expect(json.output).toContain('%Cpu(s):');
+      expect(json.output).toContain('MiB Mem');
+      expect(json.output).toContain('MiB Swap');
+      expect(json.output).toContain('systemd');
+      expect(json.output).toContain('mysqld');
+      expect(json.output).toMatch(/Tasks:\s+\d+\s+total/);
+    });
+
     it('should keep prior commands in history', async () => {
       const response = await mockFetch(new Request('http://localhost:8787/api/labs/network-intrusion-baseline/command', {
         method: 'POST',
@@ -306,6 +330,22 @@ describe('Cyberrange Worker', () => {
       expect(json.output).toBe('No failed logins');
     });
 
+    it('should keep quiet auth logs until the attack starts via cat as well', async () => {
+      const response = await mockFetch(new Request('http://localhost:8787/api/labs/network-intrusion-baseline/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          command: 'cat /var/log/auth.log',
+          shellType: 'bash',
+          attackActive: false,
+        }),
+      }), {});
+      const json = await response.json();
+
+      expect(json.output).toContain('NORMAL');
+      expect(json.output).not.toContain('Failed password');
+    });
+
     it('should reject prototype lookups as unknown commands', async () => {
       const response = await mockFetch(new Request('http://localhost:8787/api/labs/network-intrusion-baseline/command', {
         method: 'POST',
@@ -315,7 +355,45 @@ describe('Cyberrange Worker', () => {
       const json = await response.json();
 
       expect(response.status).toBe(200);
-      expect(json.error).toContain('Command not found');
+      expect(json.error).toContain('command not found');
+    });
+
+    it('should simulate a Linux filesystem with cd, ls, pwd, and cat', async () => {
+      let cwd = '/home/blueteam-user';
+      let filesystem: unknown = undefined;
+
+      const run = async (command: string) => {
+        const response = await mockFetch(new Request('http://localhost:8787/api/labs/network-intrusion-baseline/command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            command,
+            shellType: 'bash',
+            cwd,
+            filesystem,
+          }),
+        }), {});
+        const json = await response.json();
+        cwd = json.cwd;
+        filesystem = json.filesystem;
+        return json;
+      };
+
+      expect((await run('pwd')).output).toBe('/home/blueteam-user');
+      expect((await run('ls')).output).toContain('Documents');
+      expect((await run('cd Documents')).cwd).toBe('/home/blueteam-user/Documents');
+      expect((await run('pwd')).output).toBe('/home/blueteam-user/Documents');
+      expect((await run('pwd')).prompt).toBe('blueteam-user@cyberrange:~/Documents$');
+
+      const notes = await run('cat notes.txt');
+      expect(notes.output).toContain('Blue team notes');
+
+      await run('mkdir labs');
+      await run('cd labs');
+      await run('touch report.txt');
+      expect((await run('ls')).output).toContain('report.txt');
+      expect((await run('cd /var/log')).cwd).toBe('/var/log');
+      expect((await run('ls')).output).toContain('auth.log');
     });
 
     it('should handle shell-type switch', async () => {
