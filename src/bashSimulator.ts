@@ -560,8 +560,9 @@ const cmdHelp = (): string =>
   Text:        echo  grep  wc  sort  clear  history
   System:       whoami  id  hostname  date  uname  env  df  free  uptime  ps  top
   Network:      netstat  ss  ifconfig  ip  ping
-  Lab:          lab-info  baseline  start-attack  shell-type bash|powershell  help
-Tips: paths support ~, ., and ..  Example: cd /var/log && ls && cat auth.log`;
+  Lab:          lab-info  baseline  start-attack  stop-attack  shell-type bash|powershell  help
+Tips: paths support ~, ., and ..  Example: cd /var/log && ls && cat auth.log
+Attack control: start-attack turns the simulation on; stop-attack turns it off.`;
 
 export const executeBash = (
   session: BashSession,

@@ -67,11 +67,12 @@ describe('Cyberrange Worker', () => {
       const html = await response.text();
       expect(html).toContain('Network Intrusion Detection');
       expect(html).toContain('Terminal');
-      expect(html).toContain('Run: hostname, whoami, and date');
+      expect(html).toContain('Do this now:');
       expect(html).toContain('Why this matters');
       expect(html).toContain('What to observe');
       expect(html).toContain('Observation notepad');
-      expect(html).toContain('Before you hunt for attacks');
+      expect(html).toContain('Stop attack');
+      expect(html).toContain('stop-attack');
       expect(html).not.toContain('contenteditable');
       expect(html).not.toContain('location.reload');
       expect(html).not.toContain('[object Object]');
@@ -310,9 +311,15 @@ describe('Cyberrange Worker', () => {
       const grep = await run('grep Failed /var/log/auth.log');
       expect(grep.output).toContain('[ALERT]');
       expect(grep.output).toContain('203.0.113.45');
+      expect(grep.currentStep).toBe(8);
 
-      const tail = await run('tail -n 20 /var/log/auth.log');
-      expect(tail.output).toContain('Failed password');
+      const stop = await run('stop-attack');
+      expect(stop.output).toContain('ATTACK STOPPED');
+      expect(stop.attackActive).toBe(false);
+      expect(stop.currentStep).toBe(9);
+
+      const quietAgain = await run('grep Failed /var/log/auth.log');
+      expect(quietAgain.output).toBe('No failed logins');
     });
 
     it('should keep quiet auth logs until the attack starts', async () => {

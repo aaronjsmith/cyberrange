@@ -87,6 +87,29 @@ const esc = (t: string): string => {
     .replace(/'/g, '&#39;');
 };
 
+// Shared lab narrative for special commands.
+const BASH_LAB = {
+  baseline:
+    '=== BASELINE ESTABLISHED ===\nSaved a quiet-host snapshot (processes, ports 22/3306, clean auth.log).\nNEXT: Type start-attack to inject the SSH brute-force simulation.',
+  'start-attack':
+    '=== ATTACK STARTED ===\nSimulated SSH brute force from 203.0.113.45 is active.\n1) Inspect: grep Failed /var/log/auth.log\n2) Or: tail -n 20 /var/log/auth.log\n3) When finished investigating: type stop-attack',
+  'stop-attack':
+    '=== ATTACK STOPPED ===\nBrute-force simulation ended. Logs and host metrics return to baseline.\nYou can type start-attack again while the baseline is still saved.',
+  'lab-info':
+    'BLUE TEAM LAB: Network Intrusion Detection\n1) Gather host facts (hostname, whoami, date)\n2) Baseline processes, ports, resources, and auth.log\n3) Type baseline\n4) Type start-attack\n5) Find Failed password lines from 203.0.113.45\n6) Type stop-attack when done',
+};
+
+const POWERSHELL_LAB = {
+  baseline:
+    '=== BASELINE ESTABLISHED ===\nSaved a quiet Windows snapshot (services, listening ports, clean Security log).\nNEXT: Type start-attack to inject the RDP brute-force simulation.',
+  'start-attack':
+    '=== ATTACK STARTED ===\nSimulated RDP brute force from 203.0.113.45 is active.\n1) Inspect: Get-WinEvent -FilterHashtable @{LogName="Security"}\n2) When finished investigating: type stop-attack',
+  'stop-attack':
+    '=== ATTACK STOPPED ===\nBrute-force simulation ended. Security events return to baseline noise.\nYou can type start-attack again while the baseline is still saved.',
+  'lab-info':
+    'BLUE TEAM LAB: Windows Server 2025 Hardening\n1) Gather host facts (hostname, whoami, Get-Date)\n2) Baseline processes, ports, services, and Security log\n3) Type baseline\n4) Type start-attack\n5) Look for failed logons from 203.0.113.45\n6) Type stop-attack when done',
+};
+
 // PowerShell stays table-driven. Bash uses the stateful Linux simulator.
 const COMMANDS: Record<'powershell', Record<string, { output: string; baseline?: boolean; triggersAttack?: boolean }>> = {
   powershell: {
@@ -99,20 +122,15 @@ const COMMANDS: Record<'powershell', Record<string, { output: string; baseline?:
     'Get-NetTCPConnection -State Listen': { output: 'LocalAddress  LocalPort  State\n0.0.0.0      22        Listen\n0.0.0.0      80        Listen\n0.0.0.0      443       Listen\n0.0.0.0      3389       Listen', baseline: true },
     'Get-Service | Where-Object { $_.Status -eq "Running" }': { output: 'Status  Name          DisplayName\nRunning WinRM         Windows Remote Management\nRunning lanmanserver  Server', baseline: true },
     'Get-WinEvent -LogName Security -MaxEvents 5': { output: 'TimeCreated           Id  Message\n9/23/2026 7:45:00 PM  4624  An account was successfully logged on.\nNormal activity detected', baseline: true },
-    'help': { output: 'Available: whoami, hostname, Get-Date, pwd, Get-Process, Get-NetTCPConnection, Get-Service, Get-WinEvent, baseline, start-attack, shell-type bash|powershell, lab-info' },
-    'lab-info': { output: 'BLUE TEAM LAB: Windows Server 2025\nPhase 1: Document system state\nPhase 2: Type baseline\nPhase 3: Type start-attack\nPhase 4: Detect and respond' },
-    'baseline': { output: '=== BASELINE ESTABLISHED ===\nWindows Server 2025 Standard\nServices: 45 running\nPorts: 22, 80, 443, 3389\nBaseline saved\nNEXT: Type start-attack to begin', baseline: true },
-    'start-attack': { output: '=== ATTACK STARTED ===\nRDP Brute Force from 203.0.113.45\nMonitor: Get-WinEvent -FilterHashtable @{LogName=\"Security\"}\nMonitor: Get-NetTCPConnection -State Established', triggersAttack: true },
+    'help': { output: 'Available: whoami, hostname, Get-Date, pwd, Get-Process, Get-NetTCPConnection, Get-Service, Get-WinEvent, baseline, start-attack, stop-attack, shell-type bash|powershell, lab-info' },
+    'lab-info': { output: POWERSHELL_LAB['lab-info'] },
+    'baseline': { output: POWERSHELL_LAB.baseline, baseline: true },
+    'start-attack': { output: POWERSHELL_LAB['start-attack'], triggersAttack: true },
+    'stop-attack': { output: POWERSHELL_LAB['stop-attack'] },
     'shell-type bash': { output: 'Switched to bash shell. Use Linux commands.' },
     'shell-type powershell': { output: 'Switched to PowerShell shell. Use Windows commands.' },
     'Get-WinEvent -FilterHashtable @{LogName="Security"} attack': { output: 'TimeCreated           Id  Message\n9/23/2026 7:46:01  4625  Failed login from 203.0.113.45\n[ALERT] Brute Force detected!' },
   }
-};
-
-const BASH_LAB = {
-  baseline: '=== BASELINE ESTABLISHED ===\nNormal: 123 processes, ports 22/3306 open\nBaseline saved\nNEXT: Type start-attack to begin',
-  'start-attack': '=== ATTACK STARTED ===\nBrute Force SSH from 203.0.113.45\nMonitor: tail -n 20 /var/log/auth.log\nMonitor: grep Failed /var/log/auth.log',
-  'lab-info': 'BLUE TEAM LAB: Network Intrusion\nPhase 1: Run baseline commands\nPhase 2: Type baseline\nPhase 3: Type start-attack\nPhase 4: Detect and respond',
 };
 
 // Learning steps per shell type. `accept` is the exact command that completes the step.
@@ -120,105 +138,133 @@ const LEARNING_STEPS: Record<ShellType, LearningStep[]> = {
   bash: [
     {
       label: 'Identify the host',
-      why: 'Before you hunt for attacks, lock down who and what you are investigating. Hostname, user, and clock give you context for every log line that follows. If the time is wrong, failed-login timestamps will look misleading.',
-      observe: 'Note the hostname, your username, and the current time. You will compare later log timestamps against this clock.',
-      action: 'Run: hostname, whoami, and date',
+      why: 'You need to know which machine and account you are investigating before you trust any log timestamps.',
+      observe: 'Write down: hostname, your username, and the current time.',
+      action: 'Do this now:\n1. hostname\n2. whoami\n3. date',
       accept: ['hostname', 'whoami', 'date'],
       requireAll: true,
     },
     {
       label: 'Check processes',
-      why: 'A process list is your first picture of normal system activity. Blue teams capture this before an incident so they can spot unfamiliar binaries, unexpected root services, or odd CPU consumers later.',
-      observe: 'Write down long-running services you expect on a Linux training host (sshd, mysqld, systemd). Flag anything that looks unfamiliar.',
-      action: 'Run: ps aux',
+      why: 'A quiet process list is your “normal” picture. Later you will compare it against attack noise.',
+      observe: 'Expect sshd, mysqld, and systemd. Note anything unexpected.',
+      action: 'Do this now:\nps aux',
       accept: ['ps aux'],
     },
     {
       label: 'Check listening ports',
-      why: 'Listening ports show what the host is advertising to the network. Unexpected listeners are a common first sign of malware, misconfiguration, or an exposed service an attacker can probe.',
-      observe: 'Record which ports are listening (expect SSH on 22 and MySQL on 3306 here). Note whether they bind to localhost only or to all interfaces.',
-      action: 'Run: netstat -tuln',
+      why: 'Listening ports show what attackers can reach from the network.',
+      observe: 'Expect port 22 (SSH) and 3306 (MySQL on localhost). Record them.',
+      action: 'Do this now:\nnetstat -tuln',
       accept: ['netstat -tuln'],
     },
     {
       label: 'Check resources',
-      why: 'CPU and memory baselines help you separate a noisy brute-force flood from an otherwise healthy box. Spikes without a matching business workload are worth investigating.',
-      observe: 'Capture a snapshot of load, memory use, and top processes. This is your “quiet host” reference.',
-      action: 'Run: top',
+      why: 'CPU/memory baselines help you spot a brute-force flood later.',
+      observe: 'Note load average and that the host looks idle.',
+      action: 'Do this now:\ntop',
       accept: ['top'],
     },
     {
       label: 'Read authentication logs',
-      why: 'SSH authentication events live in /var/log/auth.log. Reading them now, while traffic is normal, teaches you what a healthy login pattern looks like so failed attempts stand out later.',
-      observe: 'Confirm successful logins and the absence of repeated Failed password lines. Save a short note that the log looks quiet.',
-      action: 'Run: tail -n 20 /var/log/auth.log',
+      why: 'auth.log is where SSH success/failure appears. Read it while quiet first.',
+      observe: 'You should see successful logins and NO repeated Failed password lines.',
+      action: 'Do this now:\ntail -n 20 /var/log/auth.log',
       accept: ['tail -n 20 /var/log/auth.log'],
     },
     {
       label: 'Save the baseline',
-      why: 'A baseline freezes the known-good state. In real IR you cannot always roll the clock back, so documenting normal activity before the alert is standard blue-team practice.',
-      observe: 'Summarize process count, open ports, and auth-log status in the observation notepad. Then lock it in with the baseline command.',
-      action: 'Type: baseline',
+      why: 'This locks the quiet-host snapshot so the lab can inject an attack afterward.',
+      observe: 'Summarize ports + quiet auth.log in the observation notepad.',
+      action: 'Do this now:\nbaseline',
       accept: ['baseline'],
     },
     {
       label: 'Start the attack',
-      why: 'The lab injects a simulated SSH brute-force from 203.0.113.45. Starting it only after the baseline mirrors how defenders compare pre-incident evidence with live alerts.',
-      observe: 'After the attack starts, re-check auth.log and look for Failed password lines from 203.0.113.45. Note the source IP, target accounts, and how the pattern differs from your baseline.',
-      action: 'Type: start-attack',
+      why: 'This turns on a simulated SSH brute force from 203.0.113.45.',
+      observe: 'Status should flip to ATTACK ACTIVE. Do not stop yet — investigate first.',
+      action: 'Do this now:\nstart-attack',
       accept: ['start-attack'],
+    },
+    {
+      label: 'Investigate the attack',
+      why: 'Compare live evidence against your baseline. Failed password lines are the smoking gun.',
+      observe: 'Look for Failed password and source IP 203.0.113.45. Write them in the notepad.',
+      action: 'Do this now (either command works):\ngrep Failed /var/log/auth.log\nOR\ntail -n 20 /var/log/auth.log',
+      accept: ['grep Failed /var/log/auth.log', 'tail -n 20 /var/log/auth.log'],
+    },
+    {
+      label: 'Stop the attack',
+      why: 'After you have evidence, end the simulation so the host returns to baseline.',
+      observe: 'ATTACK ACTIVE should clear. Re-check auth.log if you want to confirm it is quiet again.',
+      action: 'Do this now:\nstop-attack\n(You can also use the Stop attack button in the sidebar.)',
+      accept: ['stop-attack'],
     },
   ],
   powershell: [
     {
       label: 'Identify the host',
-      why: 'On Windows, the computer name, signed-in user, and clock are the anchors for Security event log review. Wrong host identity wastes time during escalation.',
-      observe: 'Record computer name, user, and local time before you touch Event Viewer data.',
-      action: 'Run: hostname, whoami, and Get-Date',
+      why: 'Confirm computer name, user, and clock before reading Security events.',
+      observe: 'Write down: hostname, user, and Get-Date output.',
+      action: 'Do this now:\n1. hostname\n2. whoami\n3. Get-Date',
       accept: ['hostname', 'whoami', 'Get-Date'],
       requireAll: true,
     },
     {
       label: 'Check processes',
-      why: 'Get-Process shows what is running right now. Baseline process lists make it easier to spot ransomware staging, unexpected PowerShell hosts, or odd services later.',
-      observe: 'Note common Windows processes (System, svchost). Call out anything that looks unusual for a hardened server.',
-      action: 'Run: Get-Process',
+      why: 'Capture normal Windows processes before the attack starts.',
+      observe: 'Note System/svchost and anything unusual.',
+      action: 'Do this now:\nGet-Process',
       accept: ['Get-Process'],
     },
     {
       label: 'Check listening ports',
-      why: 'Listening TCP ports reveal remote management and published services. RDP (3389) and web ports are high-value targets for brute force and scanning.',
-      observe: 'List listening ports and whether RDP/web services are exposed. This becomes your network baseline.',
-      action: 'Run: Get-NetTCPConnection -State Listen',
+      why: 'Exposed listeners (especially RDP 3389) are high-value targets.',
+      observe: 'Record listening ports, including 3389 if present.',
+      action: 'Do this now:\nGet-NetTCPConnection -State Listen',
       accept: ['Get-NetTCPConnection -State Listen'],
     },
     {
       label: 'Check running services',
-      why: 'Services define the long-lived attack surface. Unexpected auto-start services often survive reboots and are a favorite persistence mechanism.',
-      observe: 'Document running services such as WinRM and Server. Note anything you would not expect on a locked-down Windows Server.',
-      action: 'Run: Get-Service | Where-Object { $_.Status -eq "Running" }',
+      why: 'Services show long-lived attack surface and persistence options.',
+      observe: 'Note WinRM/Server and anything unexpected.',
+      action: 'Do this now:\nGet-Service | Where-Object { $_.Status -eq "Running" }',
       accept: ['Get-Service | Where-Object { $_.Status -eq "Running" }'],
     },
     {
       label: 'Read the security log',
-      why: 'Windows Security events (especially 4624 success and 4625 failure) are the primary source for login investigations. Reading a quiet log first trains your eye.',
-      observe: 'Confirm normal successful logons and no burst of failures. Write that the Security log currently looks clean.',
-      action: 'Run: Get-WinEvent -LogName Security -MaxEvents 5',
+      why: 'Security events (4624/4625) are the Windows login trail.',
+      observe: 'Confirm the log looks quiet before the attack.',
+      action: 'Do this now:\nGet-WinEvent -LogName Security -MaxEvents 5',
       accept: ['Get-WinEvent -LogName Security -MaxEvents 5'],
     },
     {
       label: 'Save the baseline',
-      why: 'Saving the baseline marks the known-good Windows state before the lab injects hostile activity.',
-      observe: 'Summarize services, ports, and quiet Security events in the observation notepad, then save the baseline.',
-      action: 'Type: baseline',
+      why: 'Lock the quiet Windows snapshot before injecting the attack.',
+      observe: 'Summarize ports/services/quiet Security log in the notepad.',
+      action: 'Do this now:\nbaseline',
       accept: ['baseline'],
     },
     {
       label: 'Start the attack',
-      why: 'The lab starts a simulated RDP brute-force from 203.0.113.45. Afterward, failed logons should appear in Security events for you to detect and document.',
-      observe: 'Re-check Security events for failed logons from 203.0.113.45. Note event IDs, source IP, and how the noise compares with your baseline.',
-      action: 'Type: start-attack',
+      why: 'This turns on a simulated RDP brute force from 203.0.113.45.',
+      observe: 'Status should flip to ATTACK ACTIVE. Investigate before stopping.',
+      action: 'Do this now:\nstart-attack',
       accept: ['start-attack'],
+    },
+    {
+      label: 'Investigate the attack',
+      why: 'Failed logons should now appear for the attacker IP.',
+      observe: 'Look for failed logons / 4625 from 203.0.113.45 and note them.',
+      action: 'Do this now:\nGet-WinEvent -FilterHashtable @{LogName="Security"}',
+      accept: ['Get-WinEvent -FilterHashtable @{LogName="Security"}'],
+    },
+    {
+      label: 'Stop the attack',
+      why: 'End the simulation once you have documented the evidence.',
+      observe: 'ATTACK ACTIVE should clear after you stop it.',
+      action: 'Do this now:\nstop-attack\n(You can also use the Stop attack button in the sidebar.)',
+      accept: ['stop-attack'],
     },
   ],
 };
@@ -309,6 +355,11 @@ const executeCommand = (body: ExecInput): ExecResult => {
   let stepChanged = false;
   let progressNote: string | null = null;
   let clear = false;
+  let trackedCmd = cmd;
+
+  if (cmd === 'stop attack' || cmd === 'end-attack') {
+    trackedCmd = 'stop-attack';
+  }
 
   if (cmd === 'baseline') {
     output = shellType === 'bash' ? BASH_LAB.baseline : COMMANDS.powershell.baseline.output;
@@ -319,6 +370,23 @@ const executeCommand = (body: ExecInput): ExecResult => {
       state.attackActive = true;
     } else {
       error = 'Cannot start attack: Baseline not established. Type "baseline" first.';
+    }
+  } else if (trackedCmd === 'stop-attack') {
+    if (state.attackActive) {
+      state.attackActive = false;
+      output = shellType === 'bash' ? BASH_LAB['stop-attack'] : COMMANDS.powershell['stop-attack'].output;
+      if (shellType === 'bash') {
+        const session = createBashSession({
+          cwd: body.cwd,
+          filesystem: body.filesystem,
+          history,
+          attackActive: false,
+        });
+        state.cwd = session.cwd;
+        state.filesystem = session.filesystem;
+      }
+    } else {
+      error = 'No attack is active. Type start-attack first (after baseline).';
     }
   } else if (cmd.startsWith('shell-type ')) {
     const newType = cmd.slice('shell-type '.length);
@@ -363,21 +431,21 @@ const executeCommand = (body: ExecInput): ExecResult => {
   // Advance only for the shell the learner is still on, and only on a successful command.
   if (mode === 'learning' && output && !error && state.shellType === shellType) {
     const stepDef = steps[state.currentStep];
-    if (stepDef && stepDef.accept.includes(cmd)) {
-      const seen = new Set([...history, cmd]);
+    if (stepDef && stepDef.accept.includes(trackedCmd)) {
+      const seen = new Set([...history, trackedCmd]);
       const finished = !stepDef.requireAll || stepDef.accept.every((expected) => seen.has(expected));
       if (finished) {
         state.currentStep += 1;
         stepChanged = true;
       } else {
         const missing = stepDef.accept.filter((expected) => !seen.has(expected));
-        progressNote = `Recorded ${cmd}. Still run: ${missing.join(', ')}`;
+        progressNote = `Recorded ${trackedCmd}. Still run: ${missing.join(', ')}`;
       }
     }
   }
 
   if (cmd) {
-    state.commandHistory = [...history, cmd].slice(-200);
+    state.commandHistory = [...history, trackedCmd === 'stop-attack' ? trackedCmd : cmd].slice(-200);
   }
 
   const prompt =
@@ -527,11 +595,11 @@ const BASH_COMMANDS = [
   'help','pwd','cd','ls','cat','less','more','head','tail','mkdir','touch','rm','rmdir','cp','mv',
   'echo','grep','find','tree','wc','sort','clear','history','whoami','id','hostname','date','uname',
   'env','printenv','df','free','uptime','ps','top','netstat','ss','ifconfig','ip','ping','which',
-  'file','chmod','chown','man','baseline','start-attack','lab-info','shell-type'
+  'file','chmod','chown','man','baseline','start-attack','stop-attack','lab-info','shell-type'
 ];
 const POWERSHELL_COMMANDS = [
   'whoami','hostname','Get-Date','pwd','Get-Process','Get-NetTCPConnection','Get-Service','Get-WinEvent',
-  'baseline','start-attack','lab-info','shell-type','help','Clear-Host','cls'
+  'baseline','start-attack','stop-attack','lab-info','shell-type','help','Clear-Host','cls'
 ];
 
 function storageKey() {
@@ -757,14 +825,16 @@ function updateSidebar() {
   if (kicker) kicker.textContent = m === 'free' ? 'Free Mode' : 'Learning Mode';
   if (term) term.textContent = 'Terminal (' + st + ')';
 
-  const freeWhy = 'Free mode is open practice on the same simulated host. Use it to explore the filesystem, re-run detections, or try commands outside the guided path.';
-  const freeObserve = 'Write anything useful you notice: paths, ports, log lines, or attack indicators.';
-  const freeAction = 'Type help for the command list. Arrow keys recall history; Tab completes commands and paths.';
-  const doneWhy = 'You finished the guided path. The host should now show attack evidence that did not exist in your baseline.';
-  const doneObserve = 'Confirm the difference between baseline and attack views in your notepad: source IP, failed logins, and which commands revealed them.';
-  const doneAction = st === 'powershell'
-    ? 'Re-check with Get-WinEvent and document your findings.'
-    : 'Re-check with tail / grep / cat on /var/log/auth.log and document your findings.';
+  const freeWhy = 'Free mode is open practice on the same simulated host.';
+  const freeObserve = 'Write anything useful: paths, ports, log lines, or attack indicators.';
+  const freeAction = 'Type help for commands.\nArrow keys = history, Tab = autocomplete.\nUse start-attack / stop-attack to control the simulation.';
+  const doneWhy = 'Guided path complete. You can keep investigating in Free mode, or restart the attack.';
+  const doneObserve = 'Your notepad should include the attacker IP 203.0.113.45 and how you found it.';
+  const doneAction = a
+    ? 'Attack is still active.\nDo this now:\nstop-attack'
+    : (st === 'powershell'
+      ? 'Optional: start-attack again, or switch to Free mode.'
+      : 'Optional: start-attack again, or switch to Free mode.');
 
   if (m === 'free') {
     if (count) count.textContent = 'Free mode';
@@ -774,7 +844,7 @@ function updateSidebar() {
     if (action) action.textContent = freeAction;
   } else if (done) {
     if (count) count.textContent = 'Lab complete';
-    if (title) title.textContent = 'Detect and document';
+    if (title) title.textContent = a ? 'Attack still active' : 'Lab complete';
     if (why) why.textContent = doneWhy;
     if (observe) observe.textContent = doneObserve;
     if (action) action.textContent = doneAction;
@@ -788,6 +858,8 @@ function updateSidebar() {
   if (fill) fill.style.width = (done || m === 'free' ? 100 : Math.round((s / total) * 100)) + '%';
   if (slot) slot.innerHTML = statusHtml();
   if (prev) prev.style.display = s > 0 ? 'inline-flex' : 'none';
+  const stopBtn = document.getElementById('stop-attack');
+  if (stopBtn) stopBtn.style.display = a ? 'inline-flex' : 'none';
 }
 
 function addBlock(text, color) {
@@ -869,6 +941,14 @@ function prevStep() {
   s = Math.max(0, s - 1);
   saveSession();
   window.location.href = '/labs/' + lid + labQuery();
+}
+
+async function stopAttack() {
+  if (!a) return;
+  const input = o && o.querySelector('input.in');
+  if (!input) return;
+  input.value = 'stop-attack';
+  await exec(input);
 }
 
 async function exec(input) {
@@ -1106,7 +1186,9 @@ ${baseStyles}
 .cst { font-size: 13px; font-weight: 700; color: var(--accent); margin: 0 0 8px; }
 .csi { font-size: 12px; color: var(--text2); line-height: 1.5; margin: 0 0 10px; }
 .cs-label { letter-spacing: .08em; text-transform: uppercase; color: var(--text3); font-size: 10px; font-weight: 700; margin: 0 0 4px; }
-.cs-action { font-family: Consolas,monospace; font-size: 12px; color: var(--good); background: rgba(74,222,128,.08); border: 1px solid rgba(74,222,128,.25); border-radius: var(--r2); padding: 8px 10px; margin: 0; line-height: 1.4; }
+.cs-action { font-family: Consolas,monospace; font-size: 12px; color: var(--good); background: rgba(74,222,128,.08); border: 1px solid rgba(74,222,128,.25); border-radius: var(--r2); padding: 8px 10px; margin: 0; line-height: 1.45; white-space: pre-wrap; }
+.ab-stop { background: rgba(248,113,113,.12); border-color: rgba(248,113,113,.45); color: var(--bad); }
+.ab-stop:hover { border-color: var(--bad); color: #fff; background: rgba(248,113,113,.25); }
 .obs { margin-top: 12px; }
 .obs-box { width: 100%; min-height: 140px; resize: vertical; background: #0a0a0a; color: var(--text); border: 1px solid var(--border); border-radius: var(--r2); padding: 10px; font-family: Consolas,monospace; font-size: 12px; line-height: 1.45; }
 .obs-box:focus { outline: 1px solid var(--accent); }
@@ -1142,17 +1224,15 @@ ${baseStyles}
 <p class="cst" id="step-title">${done ? 'Detect and document' : `Step ${step + 1}: ${esc(view.label)}`}</p>
 <p class="cs-label">Why this matters</p>
 <p class="csi" id="step-why">${done
-  ? 'You finished the guided path. The host should now show attack evidence that did not exist in your baseline.'
+  ? 'Guided path complete. You can keep investigating in Free mode, or restart the attack.'
   : esc(view.why)}</p>
 <p class="cs-label">What to observe</p>
 <p class="csi" id="step-observe">${done
-  ? 'Confirm the difference between baseline and attack views in your notepad: source IP, failed logins, and which commands revealed them.'
+  ? 'Your notepad should include the attacker IP 203.0.113.45 and how you found it.'
   : esc(view.observe)}</p>
 <p class="cs-label">What to run</p>
 <p class="cs-action" id="step-action">${done
-  ? (shellType === 'powershell'
-    ? 'Re-check with Get-WinEvent and document your findings.'
-    : 'Re-check with tail / grep / cat on /var/log/auth.log and document your findings.')
+  ? (attackActive ? 'Attack is still active.\nDo this now:\nstop-attack' : 'Optional: start-attack again, or switch to Free mode.')
   : esc(view.action)}</p>
 </div>
 <div class="obs">
@@ -1166,6 +1246,7 @@ ${baseStyles}
 ${lab.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}
 </div>
 <button class="ab" id="prev" onclick="prevStep()" style="display:${step > 0 ? 'inline-flex' : 'none'}">← Previous</button>
+<button class="ab ab-stop" id="stop-attack" onclick="stopAttack()" style="display:${attackActive ? 'inline-flex' : 'none'}; margin-top: 8px;">Stop attack</button>
 <button class="ab" onclick="resetSession()" style="margin-top: 8px;">Reset session</button>
 </div>
 <div class="shell">
