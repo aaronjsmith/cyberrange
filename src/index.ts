@@ -30,6 +30,13 @@ interface ShellState {
   baselineEstablished: boolean;
 }
 
+interface LearningStep {
+  label: string;
+  hint: string;
+  accept: string[];
+  requireAll?: boolean;
+}
+
 // Lab Definitions
 const LABS: Lab[] = [
   {
@@ -79,8 +86,9 @@ const COMMANDS: Record<ShellType, Record<string, { output: string; baseline?: bo
     'netstat -tuln': { output: 'Proto Recv-Q Send-Q Local Address   Foreign Address  State\nTCP    0      0 0.0.0.0:22       0.0.0.0:*        LISTEN\nTCP    0      0 127.0.0.1:3306   0.0.0.0:*        LISTEN', baseline: true },
     'top': { output: 'Tasks: 123 total, 1 running. %Cpu(s): 2.3us. Mem: 3456MB used', baseline: true },
     'tail -n 20 /var/log/auth.log': { output: 'Sep 23 19:45 sshd[12345]: Accepted password for blueteam-user from 192.168.1.100\n[NORMAL] No failed attempts', baseline: true },
+    'tail -n 20 /var/log/auth.log attack': { output: 'Sep 23 19:46 sshd[54321]: Failed password for blueteam-user from 203.0.113.45 port 22 ssh2\nSep 23 19:46 sshd[54322]: Failed password for root from 203.0.113.45 port 22 ssh2\nSep 23 19:46 sshd[54323]: Failed password for admin from 203.0.113.45 port 22 ssh2\n[ALERT] Brute force SSH from 203.0.113.45' },
     'grep Failed /var/log/auth.log': { output: 'No failed logins' },
-    'help': { output: 'Available: whoami, hostname, date, pwd, ps aux, netstat -tuln, top, tail -n 20 /var/log/auth.log, baseline, start-attack, shell-type bash|powershell, lab-info' },
+    'help': { output: 'Available: whoami, hostname, date, pwd, ps aux, netstat -tuln, top, tail -n 20 /var/log/auth.log, grep Failed /var/log/auth.log, baseline, start-attack, shell-type bash|powershell, lab-info, clear' },
     'lab-info': { output: 'BLUE TEAM LAB: Network Intrusion\nPhase 1: Run baseline commands\nPhase 2: Type baseline\nPhase 3: Type start-attack\nPhase 4: Detect and respond' },
     'baseline': { output: '=== BASELINE ESTABLISHED ===\nNormal: 123 processes, ports 22/3306 open\nBaseline saved\nNEXT: Type start-attack to begin', baseline: true },
     'start-attack': { output: '=== ATTACK STARTED ===\nBrute Force SSH from 203.0.113.45\nMonitor: tail -n 20 /var/log/auth.log\nMonitor: grep Failed /var/log/auth.log', triggersAttack: true },
@@ -108,31 +116,166 @@ const COMMANDS: Record<ShellType, Record<string, { output: string; baseline?: bo
   }
 };
 
-// Learning steps per shell type
-const LEARNING_STEPS: Record<ShellType, string[]> = {
+// Learning steps per shell type. `accept` is the exact command that completes the step.
+const LEARNING_STEPS: Record<ShellType, LearningStep[]> = {
   bash: [
-    'Run: hostname, whoami, date',
-    'Run: ps aux to check processes',
-    'Run: netstat -tuln to check ports',
-    'Run: top to check resources',
-    'Run: tail -n 20 /var/log/auth.log',
-    'Type: baseline to document normal state',
-    'Type: start-attack to begin simulation'
+    { label: 'Identify the host', hint: 'Run: hostname, whoami, and date', accept: ['hostname', 'whoami', 'date'], requireAll: true },
+    { label: 'Check processes', hint: 'Run: ps aux', accept: ['ps aux'] },
+    { label: 'Check listening ports', hint: 'Run: netstat -tuln', accept: ['netstat -tuln'] },
+    { label: 'Check resources', hint: 'Run: top', accept: ['top'] },
+    { label: 'Read authentication logs', hint: 'Run: tail -n 20 /var/log/auth.log', accept: ['tail -n 20 /var/log/auth.log'] },
+    { label: 'Save the baseline', hint: 'Type: baseline', accept: ['baseline'] },
+    { label: 'Start the attack', hint: 'Type: start-attack', accept: ['start-attack'] },
   ],
   powershell: [
-    'Run: hostname, whoami, Get-Date',
-    'Run: Get-Process to check processes',
-    'Run: Get-NetTCPConnection -State Listen',
-    'Run: Get-Service | Where-Object { $_.Status -eq "Running" }',
-    'Run: Get-WinEvent -LogName Security -MaxEvents 5',
-    'Type: baseline to document normal state',
-    'Type: start-attack to begin simulation'
-  ]
+    { label: 'Identify the host', hint: 'Run: hostname, whoami, and Get-Date', accept: ['hostname', 'whoami', 'Get-Date'], requireAll: true },
+    { label: 'Check processes', hint: 'Run: Get-Process', accept: ['Get-Process'] },
+    { label: 'Check listening ports', hint: 'Run: Get-NetTCPConnection -State Listen', accept: ['Get-NetTCPConnection -State Listen'] },
+    { label: 'Check running services', hint: 'Run: Get-Service | Where-Object { $_.Status -eq "Running" }', accept: ['Get-Service | Where-Object { $_.Status -eq "Running" }'] },
+    { label: 'Read the security log', hint: 'Run: Get-WinEvent -LogName Security -MaxEvents 5', accept: ['Get-WinEvent -LogName Security -MaxEvents 5'] },
+    { label: 'Save the baseline', hint: 'Type: baseline', accept: ['baseline'] },
+    { label: 'Start the attack', hint: 'Type: start-attack', accept: ['start-attack'] },
+  ],
 };
 
-const getStepHint = (shellType: ShellType, step: number): string => {
-  const hints = LEARNING_STEPS[shellType];
-  return hints[Math.min(step, hints.length - 1)] || 'Complete all steps!';
+const clampStep = (shellType: ShellType, step: number): number => {
+  const total = LEARNING_STEPS[shellType].length;
+  if (!Number.isFinite(step) || step < 0) return 0;
+  return Math.min(Math.floor(step), total);
+};
+
+const parseShellType = (value: string | null | undefined): ShellType =>
+  value === 'powershell' ? 'powershell' : 'bash';
+
+const parseMode = (value: string | null | undefined): ShellMode =>
+  value === 'free' ? 'free' : 'learning';
+
+const normalizeCommand = (command: string): string => command.trim().replace(/\s+/g, ' ');
+
+const lookupCommand = (
+  shellType: ShellType,
+  command: string,
+  attackActive: boolean,
+): { output: string } | null => {
+  const commands = COMMANDS[shellType];
+  const attackKey = `${command} attack`;
+  if (attackActive && Object.prototype.hasOwnProperty.call(commands, attackKey)) {
+    return commands[attackKey];
+  }
+  if (Object.prototype.hasOwnProperty.call(commands, command)) {
+    return commands[command];
+  }
+  return null;
+};
+
+interface ExecInput {
+  command?: string;
+  currentStep?: number;
+  mode?: ShellMode;
+  shellType?: ShellType;
+  attackActive?: boolean;
+  baselineEstablished?: boolean;
+  commandHistory?: unknown;
+}
+
+interface ExecResult {
+  output: string | null;
+  error: string | null;
+  progressNote: string | null;
+  commandHistory: string[];
+  currentStep: number;
+  mode: ShellMode;
+  shellType: ShellType;
+  attackActive: boolean;
+  baselineEstablished: boolean;
+  stepChanged: boolean;
+}
+
+const executeCommand = (body: ExecInput): ExecResult => {
+  const cmd = normalizeCommand(body.command || '');
+  const mode = parseMode(body.mode);
+  const shellType = parseShellType(body.shellType);
+  const steps = LEARNING_STEPS[shellType];
+  const history = Array.isArray(body.commandHistory)
+    ? body.commandHistory
+        .filter((entry): entry is string => typeof entry === 'string')
+        .slice(-200)
+        .map(normalizeCommand)
+    : [];
+
+  const state: ShellState = {
+    commandHistory: history,
+    currentStep: clampStep(shellType, body.currentStep ?? 0),
+    mode,
+    shellType,
+    attackActive: body.attackActive === true,
+    baselineEstablished: body.baselineEstablished === true,
+  };
+
+  let output: string | null = null;
+  let error: string | null = null;
+  let stepChanged = false;
+  let progressNote: string | null = null;
+
+  if (cmd === 'baseline') {
+    output = COMMANDS[shellType].baseline.output;
+    state.baselineEstablished = true;
+  } else if (cmd === 'start-attack') {
+    if (state.baselineEstablished) {
+      output = COMMANDS[shellType]['start-attack'].output;
+      state.attackActive = true;
+    } else {
+      error = 'Cannot start attack: Baseline not established. Type "baseline" first.';
+    }
+  } else if (cmd.startsWith('shell-type ')) {
+    const newType = cmd.slice('shell-type '.length);
+    if (newType === 'bash' || newType === 'powershell') {
+      state.shellType = newType;
+      output = `Shell switched to ${newType}. Use ${newType} commands.`;
+    } else {
+      error = `Unknown shell type: ${newType}. Use 'bash' or 'powershell'.`;
+    }
+  } else {
+    const entry = lookupCommand(shellType, cmd, state.attackActive);
+    if (entry) {
+      output = cmd === 'date' || cmd === 'Get-Date' ? new Date().toLocaleString() : entry.output;
+    } else {
+      error = `Command not found: ${cmd}. Type 'help' for available commands.`;
+    }
+  }
+
+  // Advance only for the shell the learner is still on, and only on a successful command.
+  if (mode === 'learning' && output && !error && state.shellType === shellType) {
+    const stepDef = steps[state.currentStep];
+    if (stepDef && stepDef.accept.includes(cmd)) {
+      const seen = new Set([...history, cmd]);
+      const finished = !stepDef.requireAll || stepDef.accept.every((expected) => seen.has(expected));
+      if (finished) {
+        state.currentStep += 1;
+        stepChanged = true;
+      } else {
+        const missing = stepDef.accept.filter((expected) => !seen.has(expected));
+        progressNote = `Recorded ${cmd}. Still run: ${missing.join(', ')}`;
+      }
+    }
+  }
+
+  if (cmd) {
+    state.commandHistory = [...history, cmd].slice(-200);
+  }
+
+  return {
+    output,
+    error,
+    progressNote,
+    commandHistory: state.commandHistory,
+    currentStep: state.currentStep,
+    mode: state.mode,
+    shellType: state.shellType,
+    attackActive: state.attackActive,
+    baselineEstablished: state.baselineEstablished,
+    stepChanged,
+  };
 };
 
 // HTML Generation
@@ -168,7 +311,7 @@ body { font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;
 
 const getShellPrompt = (shellType: ShellType): string => {
   if (shellType === 'powershell') {
-    return 'PS C:\Users\blueteam-user>';
+    return 'PS C:\\Users\\blueteam-user>';
   }
   return 'blueteam@cyberrange:~$';
 };
@@ -210,9 +353,9 @@ const labsIndexHTML = (): string => {
   <p class="kicker">Resources</p>
   <h2 class="pt">Training Materials</h2>
   <ul class="list">
-    <li class="li"><a href="/resources/cyberforce101.pdf" class="lil" style="color: var(--accent);">Cyber Force 101 - Course PDF</a></li>
-    <li class="li"><p class="lil">Windows Server 2025 GUI Simulation</p></li>
-    <li class="li"><p class="lil">PowerShell Command Reference</p></li>
+    <li class="li"><a href="/resources/cyberforce101.pdf.txt" class="lil" style="color: var(--accent);">Cyber Force 101 - Course notes</a></li>
+    <li class="li"><a href="/resources/windows-server-2025-gui.html" class="lil" style="color: var(--accent);">Windows Server 2025 GUI Simulation</a></li>
+    <li class="li"><a href="/resources/powershell-reference.txt" class="lil" style="color: var(--accent);">PowerShell Command Reference</a></li>
     <li class="li"><p class="lil">Blue Team Playbooks</p></li>
   </ul>
 </div>
@@ -220,20 +363,376 @@ const labsIndexHTML = (): string => {
 </body></html>`;
 };
 
+const shellClientScript = (lab: Lab, state: ShellState): string => String.raw`
+const BOOT = ${JSON.stringify({
+  labId: lab.id,
+  step: state.currentStep,
+  mode: state.mode,
+  shellType: state.shellType,
+  attackActive: state.attackActive,
+  baselineEstablished: state.baselineEstablished,
+})};
+const STEPS = ${JSON.stringify(LEARNING_STEPS)};
+const PROMPTS = ${JSON.stringify({
+  bash: getShellPrompt('bash'),
+  powershell: getShellPrompt('powershell'),
+})};
+const WELCOME = ${JSON.stringify({
+  bash: getWelcomeMessage('bash'),
+  powershell: getWelcomeMessage('powershell'),
+})};
+
+const lid = BOOT.labId;
+const o = document.getElementById('out');
+let transcript = [];
+let h = [];
+let s = BOOT.step;
+let m = BOOT.mode;
+let st = BOOT.shellType;
+let a = BOOT.attackActive;
+let b = BOOT.baselineEstablished;
+let browse = -1;
+
+function storageKey() {
+  return 'cyberrange-session-' + lid;
+}
+
+function readStore() {
+  try {
+    return JSON.parse(localStorage.getItem(storageKey()) || 'null');
+  } catch (err) {
+    return null;
+  }
+}
+
+function saveSession() {
+  try {
+    localStorage.setItem(storageKey(), JSON.stringify({
+      transcript: transcript,
+      commandHistory: h,
+      step: s,
+      mode: m,
+      shellType: st,
+      attackActive: a,
+      baselineEstablished: b,
+    }));
+  } catch (err) {}
+}
+
+function labQuery() {
+  return '?mode=' + encodeURIComponent(m)
+    + '&step=' + encodeURIComponent(String(s))
+    + '&shellType=' + encodeURIComponent(st)
+    + '&attack=' + (a ? 'true' : 'false')
+    + '&baseline=' + (b ? 'true' : 'false');
+}
+
+function syncUrl() {
+  history.replaceState(null, '', '/labs/' + lid + labQuery());
+}
+
+function promptText() {
+  return PROMPTS[st] || PROMPTS.bash;
+}
+
+function normalize(command) {
+  return String(command || '').trim().replace(/\s+/g, ' ');
+}
+
+function statusHtml() {
+  if (a) return '<span class="sb sb-a">ATTACK ACTIVE</span>';
+  if (b) return '<span class="sb sb-b">BASELINE OK</span>';
+  return '<span class="tag">Establish Baseline</span>';
+}
+
+function updateSidebar() {
+  const steps = STEPS[st] || STEPS.bash;
+  const total = steps.length;
+  const done = s >= total;
+  const view = steps[Math.min(s, total - 1)];
+  const count = document.getElementById('step-count');
+  const title = document.getElementById('step-title');
+  const hint = document.getElementById('step-hint');
+  const fill = document.getElementById('progress-fill');
+  const slot = document.getElementById('status-slot');
+  const prev = document.getElementById('prev');
+  const kicker = document.getElementById('mode-kicker');
+  const term = document.getElementById('term-label');
+  if (kicker) kicker.textContent = m === 'free' ? 'Free Mode' : 'Learning Mode';
+  if (term) term.textContent = 'Terminal (' + st + ')';
+  if (m === 'free') {
+    if (count) count.textContent = 'Free mode';
+    if (title) title.textContent = 'Free practice';
+    if (hint) hint.textContent = 'Any lab command works. Type help for the list.';
+  } else if (done) {
+    if (count) count.textContent = 'Lab complete';
+    if (title) title.textContent = 'Lab complete';
+    if (hint) hint.textContent = 'Monitor the logs and respond. Type help to list commands.';
+  } else {
+    if (count) count.textContent = 'Step ' + (s + 1) + ' of ' + total;
+    if (title) title.textContent = 'Step ' + (s + 1) + ': ' + view.label;
+    if (hint) hint.textContent = view.hint;
+  }
+  if (fill) fill.style.width = (done || m === 'free' ? 100 : Math.round((s / total) * 100)) + '%';
+  if (slot) slot.innerHTML = statusHtml();
+  if (prev) prev.style.display = s > 0 ? 'inline-flex' : 'none';
+}
+
+function addBlock(text, color) {
+  if (!text) return;
+  const line = document.createElement('div');
+  if (color) line.style.color = color;
+  line.textContent = text;
+  o.appendChild(line);
+}
+
+function appendInput() {
+  const line = document.createElement('div');
+  line.className = 'input-line';
+  const pr = document.createElement('span');
+  pr.className = 'pr';
+  pr.textContent = promptText();
+  const input = document.createElement('input');
+  input.className = 'in';
+  input.type = 'text';
+  input.setAttribute('autocomplete', 'off');
+  input.setAttribute('autocapitalize', 'off');
+  input.spellcheck = false;
+  input.setAttribute('aria-label', 'Command');
+  line.appendChild(pr);
+  line.appendChild(input);
+  o.appendChild(line);
+  input.focus();
+  o.scrollTop = o.scrollHeight;
+  return input;
+}
+
+function paintEntry(entry) {
+  const line = document.createElement('div');
+  const pr = document.createElement('span');
+  pr.className = 'pr';
+  pr.textContent = promptText();
+  const cmd = document.createElement('span');
+  cmd.textContent = ' ' + entry.command;
+  line.appendChild(pr);
+  line.appendChild(cmd);
+  o.appendChild(line);
+  addBlock(entry.output, '');
+  addBlock(entry.note, '#fbbf24');
+  addBlock(entry.error, '#ff5555');
+}
+
+function paint() {
+  o.textContent = '';
+  if (!transcript.length) {
+    const welcome = document.createElement('div');
+    welcome.style.color = '#888';
+    welcome.textContent = WELCOME[st] || WELCOME.bash;
+    o.appendChild(welcome);
+  }
+  transcript.forEach(paintEntry);
+  appendInput();
+}
+
+function resetSession() {
+  if (confirm('Reset this lab session? All command history and progress will be cleared.')) {
+    localStorage.removeItem(storageKey());
+    window.location.href = '/labs/' + lid;
+  }
+}
+
+function setMode(mode) {
+  m = mode;
+  saveSession();
+  window.location.href = '/labs/' + lid + labQuery();
+}
+
+function setShellType(shell) {
+  st = shell;
+  saveSession();
+  window.location.href = '/labs/' + lid + labQuery();
+}
+
+function prevStep() {
+  s = Math.max(0, s - 1);
+  saveSession();
+  window.location.href = '/labs/' + lid + labQuery();
+}
+
+async function exec(input) {
+  if (input.disabled) return;
+  const c = normalize(input.value);
+  if (!c) return;
+  input.disabled = true;
+  browse = -1;
+
+  if (c === 'clear' || c === 'cls' || c === 'Clear-Host') {
+    transcript = [];
+    h = [];
+    saveSession();
+    paint();
+    return;
+  }
+
+  const line = input.parentElement;
+  line.textContent = '';
+  const pr = document.createElement('span');
+  pr.className = 'pr';
+  pr.textContent = promptText();
+  const cmd = document.createElement('span');
+  cmd.textContent = ' ' + c;
+  line.appendChild(pr);
+  line.appendChild(cmd);
+
+  let data = null;
+  try {
+    const r = await fetch('/api/labs/' + lid + '/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        command: c,
+        currentStep: s,
+        mode: m,
+        shellType: st,
+        attackActive: a,
+        baselineEstablished: b,
+        commandHistory: h,
+      }),
+    });
+    data = await r.json();
+    if (!r.ok) {
+      addBlock((data && data.error) || 'Error talking to the lab. Try again.', '#ff5555');
+      appendInput();
+      return;
+    }
+  } catch (err) {
+    addBlock('Error talking to the lab. Try again.', '#ff5555');
+    appendInput();
+    return;
+  }
+
+  addBlock(data.output, '');
+  addBlock(data.progressNote, '#fbbf24');
+  addBlock(data.error, '#ff5555');
+
+  transcript.push({
+    command: c,
+    output: data.output || '',
+    error: data.error || '',
+    note: data.progressNote || '',
+  });
+  if (transcript.length > 200) transcript.shift();
+  h = transcript.map(function (entry) { return entry.command; });
+
+  if (typeof data.currentStep === 'number') s = data.currentStep;
+  if (data.mode) m = data.mode;
+  const nextShell = data.shellType || st;
+  a = data.attackActive === true;
+  b = data.baselineEstablished === true;
+  saveSession();
+
+  if (nextShell !== st) {
+    st = nextShell;
+    saveSession();
+    window.location.href = '/labs/' + lid + labQuery();
+    return;
+  }
+
+  syncUrl();
+  updateSidebar();
+  appendInput();
+}
+
+function boot() {
+  const params = new URLSearchParams(location.search);
+  const stored = readStore();
+  const explicit = params.has('step') || params.has('mode') || params.has('shellType') || params.has('attack') || params.has('baseline');
+
+  if (stored && !explicit) {
+    if (stored.shellType === 'bash' || stored.shellType === 'powershell') st = stored.shellType;
+    if (stored.mode === 'learning' || stored.mode === 'free') m = stored.mode;
+    if (typeof stored.step === 'number') s = stored.step;
+    if (typeof stored.attackActive === 'boolean') a = stored.attackActive;
+    if (typeof stored.baselineEstablished === 'boolean') b = stored.baselineEstablished;
+    const drift = st !== BOOT.shellType || m !== BOOT.mode || s !== BOOT.step || a !== BOOT.attackActive || b !== BOOT.baselineEstablished;
+    if (drift) {
+      window.location.replace('/labs/' + lid + labQuery());
+      return;
+    }
+  }
+
+  if (stored && (!stored.shellType || stored.shellType === st)) {
+    if (Array.isArray(stored.transcript)) {
+      transcript = stored.transcript.filter(function (entry) {
+        return entry && typeof entry.command === 'string';
+      });
+    } else if (Array.isArray(stored.commandHistory)) {
+      transcript = stored.commandHistory.filter(function (command) {
+        return typeof command === 'string';
+      }).map(function (command) {
+        return { command: command, output: '', error: '', note: '' };
+      });
+    }
+    h = transcript.map(function (entry) { return entry.command; });
+  }
+
+  updateSidebar();
+  paint();
+  syncUrl();
+}
+
+if (o) {
+  o.addEventListener('click', function (e) {
+    if (e.target && e.target.classList && e.target.classList.contains('in')) return;
+    const input = o.querySelector('input.in');
+    if (input) input.focus();
+  });
+  o.addEventListener('keydown', function (e) {
+    const input = e.target;
+    if (!input || !input.classList || !input.classList.contains('in')) return;
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'l' || e.key === 'L')) {
+      e.preventDefault();
+      transcript = [];
+      h = [];
+      browse = -1;
+      saveSession();
+      paint();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      exec(input);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!h.length) return;
+      if (browse < 0) browse = h.length;
+      if (browse > 0) browse -= 1;
+      input.value = h[browse];
+    } else if (e.key === 'ArrowDown') {
+      if (browse < 0) return;
+      e.preventDefault();
+      browse += 1;
+      if (browse >= h.length) {
+        browse = -1;
+        input.value = '';
+      } else {
+        input.value = h[browse];
+      }
+    }
+  });
+}
+
+boot();
+`;
+
 const shellHTML = (lab: Lab, state: ShellState): string => {
-  const { commandHistory, attackActive, baselineEstablished, shellType } = state;
+  const { attackActive, baselineEstablished, shellType } = state;
   const step = state.currentStep;
-  const totalSteps = LEARNING_STEPS[shellType].length;
-  const progress = Math.round(((step + 1) / totalSteps) * 100);
-  
-  const prompt = getShellPrompt(shellType);
-  const welcome = getWelcomeMessage(shellType);
-  
-  const history = commandHistory.length > 0
-    ? commandHistory.map(c => 
-        `<div><span style="color:var(--accent)">${prompt}</span> <span style="color:#fff">${esc(c)}</span></div>`
-      ).join('')
-    : `<div style="color:#888">${welcome}</div>`;
+  const steps = LEARNING_STEPS[shellType];
+  const totalSteps = steps.length;
+  const done = step >= totalSteps;
+  const view = steps[Math.min(step, Math.max(totalSteps - 1, 0))];
+  const progress = done ? 100 : Math.round((step / totalSteps) * 100);
 
   const modeTabs = (m: ShellMode) => ['learning','free'].map(x =>
     `<span class="tab" onclick="setMode('${x}')" style="padding:6px 12px;border-radius:999px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);${x===m?'background:var(--accent);color:#fff': 'background:var(--bg3);color:var(--text2)'}">${x}</span>`
@@ -243,8 +742,6 @@ const shellHTML = (lab: Lab, state: ShellState): string => {
     `<span class="tab" onclick="setShellType('${x}')" style="padding:6px 12px;border-radius:999px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);${x===s?'background:var(--accent);color:#fff': 'background:var(--bg3);color:var(--text2)'}">${x}</span>`
   ).join('');
 
-  const steps = LEARNING_STEPS[shellType];
-
   return `<!doctype html>
 <html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>${lab.title}</title><style>
@@ -252,7 +749,8 @@ ${baseStyles}
 .lab { display: grid; grid-template-columns: 280px 1fr; gap: 20px; }
 .sidebar { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; }
 .pb { height: 4px; background: var(--bg3); border-radius: 2px; overflow: hidden; margin-bottom: 8px; }
-.pf { height: 100%; background: linear-gradient(90deg,var(--accent),var(--good)); width: ${progress}%; transition: width .3s; }
+.pf { height: 100%; background: linear-gradient(90deg,var(--accent),var(--good)); width: 0; transition: width .3s; }
+@media (max-width: 800px) { .lab { grid-template-columns: 1fr; } }
 .cs { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r2); padding: 12px; margin-top: 12px; }
 .cst { font-size: 13px; font-weight: 700; color: var(--accent); margin: 0 0 4px; }
 .csi { font-size: 12px; color: var(--text2); line-height: 1.45; margin: 0; }
@@ -264,9 +762,9 @@ ${baseStyles}
 .out { flex: 1; background: #0a0a0a; border: 1px solid var(--border); border-radius: var(--r2); padding: 12px; font-family: Consolas,monospace; font-size: 12px; line-height: 1.5; color: #d4d4d4; overflow-y: auto; min-height: 300px; white-space: pre-wrap; }
 .ipc { display: flex; gap: 8px; margin-top: 12px; }
 .pr { color: var(--accent); font-family: Consolas,monospace; font-size: 12px; white-space: nowrap; }
-.in { background: transparent; border: none; padding: 0; margin: 0; font-family: Consolas,monospace; font-size: 12px; color: var(--text); outline: none; display: inline; }
+.in { background: transparent; border: none; padding: 0; margin: 0; font-family: Consolas,monospace; font-size: 12px; color: #fff; outline: none; flex: 1; min-width: 0; caret-color: #fff; }
 .in:focus { outline: none; }
-.input-line { display: flex; align-items: center; gap: 8px; }
+.input-line { display: flex; align-items: center; gap: 8px; width: 100%; white-space: nowrap; }
 .sb { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
 .sb-b { background: rgba(74,222,128,.15); color: var(--good); border: 1px solid rgba(74,222,128,.3); }
 .sb-a { background: rgba(248,113,113,.15); color: var(--bad); border: 1px solid rgba(248,113,113,.3); animation: p 1s infinite; }
@@ -281,170 +779,25 @@ ${baseStyles}
 <a href="/labs" class="back">← All Labs</a>
 <div class="lab">
 <div class="sidebar">
-<p class="kicker">Learning Mode</p><h3 style="margin:6px 0 2px;font-size:14px;font-weight:700">Progress</h3>
-<div style="margin-bottom:12px"><div class="pb"><div class="pf"></div></div>
-<p style="font-size:11px;color:var(--text3)">Step ${step+1} of ${totalSteps}</p></div>
-<div class="cs"><p class="cst">Step ${step+1}: ${steps[Math.min(step, steps.length - 1)]}</p>
-<p class="csi">${getStepHint(shellType, step)}</p></div>
+<p class="kicker" id="mode-kicker">${state.mode === 'free' ? 'Free Mode' : 'Learning Mode'}</p><h3 style="margin:6px 0 2px;font-size:14px;font-weight:700">Progress</h3>
+<div style="margin-bottom:12px"><div class="pb"><div class="pf" id="progress-fill" style="width:${progress}%"></div></div>
+<p id="step-count" style="font-size:11px;color:var(--text3)">${done ? 'Lab complete' : `Step ${step + 1} of ${totalSteps}`}</p></div>
+<div class="cs"><p class="cst" id="step-title">${done ? 'Lab complete' : `Step ${step + 1}: ${esc(view.label)}`}</p>
+<p class="csi" id="step-hint">${done ? 'Monitor the logs and respond. Type help to list commands.' : esc(view.hint)}</p></div>
 <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
-${attackActive ? '<span class="sb sb-a">ATTACK ACTIVE</span>' : baselineEstablished ? '<span class="sb sb-b">BASELINE OK</span>' : '<span class="tag">Establish Baseline</span>'}
-<span class="tag">${lab.difficulty}</span>
-${lab.tags.map(t=>`<span class="tag">${t}</span>`).join('')}
+<span id="status-slot">${attackActive ? '<span class="sb sb-a">ATTACK ACTIVE</span>' : baselineEstablished ? '<span class="sb sb-b">BASELINE OK</span>' : '<span class="tag">Establish Baseline</span>'}</span>
+<span class="tag">${esc(lab.difficulty)}</span>
+${lab.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}
 </div>
-${step>0 ? '<button class="ab" onclick="prevStep()">← Previous</button>' : ''}
-      <button class="ab" onclick="resetSession()" style="margin-top: 8px;">🔄 Reset Session</button>
+<button class="ab" id="prev" onclick="prevStep()" style="display:${step > 0 ? 'inline-flex' : 'none'}">← Previous</button>
+<button class="ab" onclick="resetSession()" style="margin-top: 8px;">Reset session</button>
 </div>
 <div class="shell">
-<div class="sh"><span class="st2">Terminal (${shellType})</span><div style="display:flex;gap:8px;">${modeTabs(state.mode)}</div><div style="margin-top:8px;">${shellTabs(shellType)}</div></div>
-<div class="out" id="out">${history}<span class="input-line"><span class="pr" id="prompt">${prompt}</span><span class="in" id="in" contenteditable="true" autocomplete="off"></span></span></div>
+<div class="sh"><span class="st2" id="term-label">Terminal (${esc(shellType)})</span><div style="display:flex;gap:8px;">${modeTabs(state.mode)}</div><div style="margin-top:8px;">${shellTabs(shellType)}</div></div>
+<div class="out" id="out"></div>
 </div></div></div></div>
 <script>
-const lid='${lab.id}';
-let i=document.getElementById('in');
-const o=document.getElementById('out');
-const pr=document.getElementById('prompt');
-
-// Focus input when clicking anywhere in the shell output
-if(o) o.addEventListener('click', () => { 
-  const activeInput = o.querySelector('.in');
-  if(activeInput) { 
-    activeInput.focus();
-    const range = document.createRange();
-    const sel = window.getSelection();
-    range.selectNodeContents(activeInput);
-    range.collapse(false);
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }
-});
-
-// Use event delegation - listen for keydown on .out, but only handle .in elements
-if(o) {
-  o.addEventListener('keydown', function(e) {
-    const target = e.target;
-    // Only handle if the keydown is on a .in span
-    if(target && target.classList && target.classList.contains('in')) {
-      if(e.key=='ArrowUp'&&h[0]){
-        e.preventDefault();
-        target.textContent=h[h.length-1];
-        const range = document.createRange();
-        const sel = window.getSelection();
-        range.selectNodeContents(target);
-        range.collapse(false);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
-      if(e.key=='Enter'){
-        e.preventDefault();
-        // Store reference to current input before exec
-        const currentInput = target;
-        exec(e, currentInput);
-      }
-    }
-  });
-}
-
-// Initial focus
-if(i) i.focus();
-
-let h=${JSON.stringify(commandHistory)};
-let s=${step};
-let m='${state.mode}';
-let st='${shellType}';
-let a=${attackActive};
-let b=${baselineEstablished};
-
-// Load session from localStorage
-const stored = localStorage.getItem('cyberrange-session-' + lid);
-if(stored) {
-  try {
-    const storedData = JSON.parse(stored);
-    if(storedData.commandHistory) h = storedData.commandHistory;
-    if(storedData.step !== undefined) s = storedData.step;
-    if(storedData.mode) m = storedData.mode;
-    if(storedData.shellType) st = storedData.shellType;
-    if(storedData.attackActive !== undefined) a = storedData.attackActive;
-    if(storedData.baselineEstablished !== undefined) b = storedData.baselineEstablished;
-  } catch(e) {}
-}
-
-// Save session to localStorage
-function saveSession() {
-  const data = { commandHistory: h, step: s, mode: m, shellType: st, attackActive: a, baselineEstablished: b };
-  localStorage.setItem('cyberrange-session-' + lid, JSON.stringify(data));
-}
-
-// Reset session
-function resetSession() {
-  if(confirm('Reset this lab session? All command history and progress will be cleared.')) {
-    localStorage.removeItem('cyberrange-session-' + lid);
-    window.location.reload();
-  }
-}
-
-
-async function exec(e, currentInput){
-  e.preventDefault();
-  const c=currentInput.textContent.trim();
-  if(!c)return;
-  
-  // The current input line already has prompt + command
-  // We just need to make it non-editable and add a newline
-  const inputLine = currentInput.parentElement;
-  if(inputLine) {
-    // Remove contenteditable from current input to make it static text
-    currentInput.removeAttribute('contenteditable');
-    // Add a newline after the command
-    const br = document.createElement('div');
-    o.insertBefore(br, inputLine.nextSibling);
-  }
-  
-  try{
-    const r=await fetch('/api/labs/'+lid+'/command',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({command:c,currentStep:s,mode:m,shellType:st,attackActive:a,baselineEstablished:b})
-    });
-    const d=await r.json();
-    
-    // Add output
-    if(d.output){const e=document.createElement('div');e.textContent=d.output;o.appendChild(e);}
-    if(d.error){const e=document.createElement('div');e.innerHTML='<span style="color:#ff5555">'+esc(d.error)+'</span>';o.appendChild(e);}
-    
-    // Create new input line for next command (prompt + editable input)
-    const newLine=document.createElement('span');
-    newLine.className='input-line';
-    newLine.innerHTML='<span class="pr">'+pr.textContent+'</span><span class="in" contenteditable="true"></span>';
-    o.appendChild(newLine);
-    
-    // Update i to the new input
-    i=newLine.querySelector('.in');
-    
-    // Update h (command history)
-    h=d.commandHistory||[...h,c];
-    s=d.currentStep!==undefined?d.currentStep:s;
-    m=d.mode||m;
-    st=d.shellType||st;
-    a=d.attackActive!==undefined?d.attackActive:a;
-    b=d.baselineEstablished!==undefined?d.baselineEstablished:b;
-    saveSession();
-    
-    o.scrollTop=o.scrollHeight;
-    if(d.stepChanged!==undefined&&d.stepChanged)window.location.reload();
-    else if(st!==pr.textContent.split(' ')[0])window.location.reload();
-    
-    // Focus the new input
-    i.focus();
-    const range = document.createRange();
-    const sel = window.getSelection();
-    range.selectNodeContents(i);
-    range.collapse(false);
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }catch(err){const e=document.createElement('div');e.innerHTML='<span style="color:#ff5555">Error</span>';o.appendChild(e);}
-}
-function setMode(x){saveSession();window.location.href='/labs/'+lid+'?mode='+x+'&step='+s+'&shellType='+st+'&attack='+a+'&baseline='+b;}
-function setShellType(x){saveSession();window.location.href='/labs/'+lid+'?mode='+m+'&step='+s+'&shellType='+x+'&attack='+a+'&baseline='+b;}
-function prevStep(){saveSession();window.location.href='/labs/'+lid+'?mode='+m+'&step='+Math.max(0,s-1)+'&shellType='+st+'&attack='+a+'&baseline='+b;}
+${shellClientScript(lab, state)}
 </script>
 </body></html>`;
 };
@@ -505,9 +858,9 @@ const DASHBOARD_HTML = `<!doctype html>
         <p class="kicker">Resources</p>
         <h2 class="pt">Training Materials</h2>
         <ul class="list">
-          <li class="li"><a href="/resources/cyberforce101.pdf" class="lil" style="color: var(--accent);">Cyber Force 101 - Course PDF</a></li>
-          <li class="li"><p class="lil">Windows Server 2025 GUI Simulation</p></li>
-          <li class="li"><p class="lil">PowerShell Command Reference</p></li>
+          <li class="li"><a href="/resources/cyberforce101.pdf.txt" class="lil" style="color: var(--accent);">Cyber Force 101 - Course notes</a></li>
+          <li class="li"><a href="/resources/windows-server-2025-gui.html" class="lil" style="color: var(--accent);">Windows Server 2025 GUI Simulation</a></li>
+          <li class="li"><a href="/resources/powershell-reference.txt" class="lil" style="color: var(--accent);">PowerShell Command Reference</a></li>
           <li class="li"><p class="lil">Blue Team Playbooks</p></li>
         </ul>
       </div>
@@ -540,7 +893,7 @@ export default {
     }
 
     // Lab shell
-    const labMatch = path.match(/^\/labs\/([a-z-]+)$/);
+    const labMatch = path.match(/^\/labs\/([a-z0-9-]+)$/);
     if (labMatch) {
       const labId = labMatch[1];
       const lab = LABS.find(l => l.id === labId);
@@ -550,9 +903,12 @@ export default {
 
       // Parse query params
       const params = new URLSearchParams(url.search);
-      const mode = (params.get('mode') as ShellMode) || 'learning';
-      const currentStep = parseInt(params.get('step') || '0');
-      const shellType = (params.get('shellType') as ShellType) || 'bash';
+      const mode = parseMode(params.get('mode'));
+      const requestedShell = params.get('shellType');
+      const shellType = requestedShell
+        ? parseShellType(requestedShell)
+        : (lab.id === 'windows-server-2025' ? 'powershell' : 'bash');
+      const currentStep = clampStep(shellType, Number.parseInt(params.get('step') || '0', 10));
       const attackActive = params.get('attack') === 'true';
       const baselineEstablished = params.get('baseline') === 'true';
 
@@ -571,7 +927,7 @@ export default {
     }
 
     // API: Lab command execution
-    const commandMatch = path.match(/^\/api\/labs\/([a-z-]+)\/command$/);
+    const commandMatch = path.match(/^\/api\/labs\/([a-z0-9-]+)\/command$/);
     if (commandMatch) {
       const labId = commandMatch[1];
       const lab = LABS.find(l => l.id === labId);
@@ -590,104 +946,16 @@ export default {
       }
 
       try {
-        const body = await request.json<{
-          command?: string;
-          currentStep?: number;
-          mode?: ShellMode;
-          shellType?: ShellType;
-          attackActive?: boolean;
-          baselineEstablished?: boolean;
-        }>();
-        const { command, currentStep, mode, shellType, attackActive, baselineEstablished } = body;
+        const body = await request.json<ExecInput>();
 
-        if (!command) {
+        if (!body || typeof body !== 'object' || !body.command || !normalizeCommand(body.command)) {
           return new Response(JSON.stringify({ error: 'No command provided' }), {
             status: 400,
             headers: { 'Content-Type': 'application/json' },
           });
         }
 
-        const st: ShellType = shellType ?? 'bash';
-        const m: ShellMode = mode ?? 'learning';
-
-        let state: ShellState = {
-          commandHistory: [],
-          currentStep: currentStep ?? 0,
-          mode: m,
-          shellType: st,
-          attackActive: attackActive ?? false,
-          baselineEstablished: baselineEstablished ?? false,
-        };
-
-        // Process command
-        const cmd = command.trim();
-        let output: string | null = null;
-        let error: string | null = null;
-        let stepChanged = false;
-
-        const commands = COMMANDS[st];
-
-        // Handle special commands
-        if (cmd === 'baseline') {
-          output = commands['baseline'].output;
-          state.baselineEstablished = true;
-          if (m === 'learning' && state.currentStep < 5) {
-            state.currentStep = 5;
-            stepChanged = true;
-          }
-        } else if (cmd === 'start-attack') {
-          if (state.baselineEstablished) {
-            output = commands['start-attack'].output;
-            state.attackActive = true;
-            if (m === 'learning' && state.currentStep < 6) {
-              state.currentStep = 6;
-              stepChanged = true;
-            }
-          } else {
-            error = 'Cannot start attack: Baseline not established. Type "baseline" first.';
-          }
-        } else if (cmd.startsWith('shell-type ')) {
-          const newType = cmd.split(' ')[1];
-          if (newType === 'bash' || newType === 'powershell') {
-            state.shellType = newType as ShellType;
-            output = `Shell switched to ${newType}. Use ${newType} commands.`;
-          } else {
-            error = `Unknown shell type: ${newType}. Use 'bash' or 'powershell'.`;
-          }
-        } else {
-          // Regular commands
-          const cmdKey = cmd in commands ? cmd : (state.attackActive ? `${cmd} attack` : cmd);
-          
-          if (cmdKey in commands) {
-            output = commands[cmdKey].output;
-          } else {
-            error = `Command not found: ${cmd}. Type 'help' for available commands.`;
-          }
-        }
-
-        // In learning mode, check if command matches expected action
-        if (m === 'learning' && !stepChanged && output) {
-          const expected = LEARNING_STEPS[st];
-          if (state.currentStep < expected.length && cmd === expected[state.currentStep]) {
-            state.currentStep = Math.min(state.currentStep + 1, expected.length - 1);
-            stepChanged = true;
-          }
-        }
-
-        // Update command history
-        state.commandHistory = [...(state.commandHistory || []), cmd];
-
-        return new Response(JSON.stringify({
-          output,
-          error,
-          commandHistory: state.commandHistory,
-          currentStep: state.currentStep,
-          mode: state.mode,
-          shellType: state.shellType,
-          attackActive: state.attackActive,
-          baselineEstablished: state.baselineEstablished,
-          stepChanged,
-        }), {
+        return new Response(JSON.stringify(executeCommand(body)), {
           headers: { 'Content-Type': 'application/json' },
         });
       } catch (err) {
@@ -725,7 +993,7 @@ export default {
       const resourceName = path.split('/').pop();
       
       // Serve actual resource files
-      if (resourceName === 'cyberforce101.pdf.txt') {
+      if (resourceName === 'cyberforce101.pdf.txt' || resourceName === 'cyberforce101.pdf') {
         const content = `CYBERRANGE BLUE TEAM TRAINING - COURSE MATERIALS
 ==================================================
 
@@ -972,7 +1240,7 @@ lab-info          - Show lab information`;
 function showWindow(id) { document.querySelectorAll('.window').forEach(w=>w.classList.remove('active')); document.getElementById(id+'-window')?.classList.add('active'); if(id==='powershell')document.getElementById('ps-input')?.focus(); }
 function hideWindow(id) { document.getElementById(id+'-window')?.classList.remove('active'); }
 const cmds = { whoami:'CYBERRANGE\\\\blueteam-user', hostname:'WIN-SRV-2025-01', 'Get-Process':'Processes running', baseline:'=== BASELINE ESTABLISHED ===\nWindows Server 2025', 'start-attack':'=== ATTACK STARTED ===\nRDP Brute Force detected' };
-document.getElementById('ps-input')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ const i=document.getElementById('ps-input'),o=document.getElementById('ps-output'),c=i?.value.trim(); if(c&&i&&o){ o.innerHTML+='<p>> '+c+'</p>'; o.innerHTML+='<p>'+(cmds[c]||'Unknown command')+'</p>'; i.value=''; o.scrollTop=o.scrollHeight; } } });
+document.getElementById('ps-input')?.addEventListener('keydown',e=>{ if(e.key!=='Enter')return; const i=document.getElementById('ps-input'),o=document.getElementById('ps-output'),c=i&&i.value.trim(); if(!c||!o)return; const cmd=document.createElement('p'); cmd.textContent='> '+c; const out=document.createElement('p'); out.textContent=cmds[c]||'Unknown command'; o.appendChild(cmd); o.appendChild(out); i.value=''; o.scrollTop=o.scrollHeight; });
 </script>
 </body></html>`;
         return new Response(winGuiHtml, {

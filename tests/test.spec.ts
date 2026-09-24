@@ -67,6 +67,30 @@ describe('Cyberrange Worker', () => {
       const html = await response.text();
       expect(html).toContain('Network Intrusion Detection');
       expect(html).toContain('Terminal');
+      expect(html).toContain('Run: hostname, whoami, and date');
+      expect(html).not.toContain('contenteditable');
+      expect(html).not.toContain('location.reload');
+      expect(html).not.toContain('[object Object]');
+
+      const script = html.match(/<script>\n([\s\S]*?)<\/script>/);
+      expect(script).toBeTruthy();
+      expect(script?.[1]).toContain('replace(/\\s+/g, \' \')');
+      expect(script?.[1]).toContain('blueteam@cyberrange:~$');
+      expect(() => new Function(script?.[1] || '')).not.toThrow();
+    });
+
+    it('should open the Windows Server 2025 lab in PowerShell', async () => {
+      const request = new Request('http://localhost:8787/labs/windows-server-2025', {
+        method: 'GET',
+      });
+
+      const response = await mockFetch(request, {});
+      const html = await response.text();
+
+      expect(response.status).toBe(200);
+      expect(html).toContain('Windows Server 2025 Hardening');
+      expect(html).toContain('Terminal (powershell)');
+      expect(html).toContain('PS C:\\\\Users\\\\blueteam-user>');
     });
 
     it('should return 404 for unknown lab', async () => {
@@ -174,6 +198,124 @@ describe('Cyberrange Worker', () => {
       
       expect(json.output).toContain('ATTACK STARTED');
       expect(json.attackActive).toBe(true);
+    });
+
+    it('should keep prior commands in history', async () => {
+      const response = await mockFetch(new Request('http://localhost:8787/api/labs/network-intrusion-baseline/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          command: 'whoami',
+          shellType: 'bash',
+          commandHistory: ['hostname'],
+        }),
+      }), {});
+      const json = await response.json();
+
+      expect(json.commandHistory).toEqual(['hostname', 'whoami']);
+      expect(json.output).toBe('blueteam-user');
+    });
+
+    it('should collapse extra whitespace before lookup', async () => {
+      const response = await mockFetch(new Request('http://localhost:8787/api/labs/network-intrusion-baseline/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: 'ps  aux', shellType: 'bash' }),
+      }), {});
+      const json = await response.json();
+
+      expect(json.output).toContain('blueteam');
+      expect(json.error).toBeNull();
+    });
+
+    it('should advance the bash learning steps and reveal the attack in the logs', async () => {
+      let step = 0;
+      let history: string[] = [];
+      let baseline = false;
+      let attack = false;
+
+      const run = async (command: string) => {
+        const response = await mockFetch(new Request('http://localhost:8787/api/labs/network-intrusion-baseline/command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            command,
+            shellType: 'bash',
+            mode: 'learning',
+            currentStep: step,
+            commandHistory: history,
+            baselineEstablished: baseline,
+            attackActive: attack,
+          }),
+        }), {});
+        const json = await response.json();
+        step = json.currentStep;
+        history = json.commandHistory;
+        baseline = json.baselineEstablished;
+        attack = json.attackActive;
+        return json;
+      };
+
+      const hostname = await run('hostname');
+      expect(hostname.stepChanged).toBe(false);
+      expect(hostname.progressNote).toContain('whoami');
+      expect(hostname.output).toBe('cyberrange-training-01');
+
+      await run('whoami');
+      const identified = await run('date');
+      expect(identified.stepChanged).toBe(true);
+      expect(identified.currentStep).toBe(1);
+      expect(identified.output).toBeTruthy();
+
+      expect((await run('ps aux')).currentStep).toBe(2);
+      expect((await run('netstat -tuln')).currentStep).toBe(3);
+      expect((await run('top')).currentStep).toBe(4);
+
+      const quietLog = await run('tail -n 20 /var/log/auth.log');
+      expect(quietLog.currentStep).toBe(5);
+      expect(quietLog.output).toContain('NORMAL');
+
+      const baselineResult = await run('baseline');
+      expect(baselineResult.currentStep).toBe(6);
+      expect(baselineResult.baselineEstablished).toBe(true);
+
+      const attackResult = await run('start-attack');
+      expect(attackResult.currentStep).toBe(7);
+      expect(attackResult.attackActive).toBe(true);
+
+      const grep = await run('grep Failed /var/log/auth.log');
+      expect(grep.output).toContain('[ALERT]');
+      expect(grep.output).toContain('203.0.113.45');
+
+      const tail = await run('tail -n 20 /var/log/auth.log');
+      expect(tail.output).toContain('Failed password');
+    });
+
+    it('should keep quiet auth logs until the attack starts', async () => {
+      const response = await mockFetch(new Request('http://localhost:8787/api/labs/network-intrusion-baseline/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          command: 'grep Failed /var/log/auth.log',
+          shellType: 'bash',
+          attackActive: false,
+        }),
+      }), {});
+      const json = await response.json();
+
+      expect(json.output).toBe('No failed logins');
+    });
+
+    it('should reject prototype lookups as unknown commands', async () => {
+      const response = await mockFetch(new Request('http://localhost:8787/api/labs/network-intrusion-baseline/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: 'toString', shellType: 'bash' }),
+      }), {});
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json.error).toContain('Command not found');
     });
 
     it('should handle shell-type switch', async () => {
