@@ -14,6 +14,7 @@ import {
 
 export interface Env {
   CYBERRANGE_ENV?: string;
+  ASSETS?: Fetcher;
 }
 
 // Types
@@ -573,7 +574,7 @@ const labsIndexHTML = (base = ''): string => {
   <h2 class="pt">Training Materials</h2>
   <ul class="list">
     <li class="li"><a href="${appPath(base, '/resources/cyberforce101.pdf.txt')}" class="lil" style="color: var(--accent);">Cyber Force 101 - Course notes</a></li>
-    <li class="li"><a href="${appPath(base, '/resources/windows-server-2025-gui.html')}" class="lil" style="color: var(--accent);">Windows Server 2025 GUI Simulation</a></li>
+    <li class="li"><a href="${appPath(base, '/desktop/windows-server-2025')}" class="lil" style="color: var(--accent);">Windows Server 2025 Desktop UI</a></li>
     <li class="li"><a href="${appPath(base, '/resources/powershell-reference.txt')}" class="lil" style="color: var(--accent);">PowerShell Command Reference</a></li>
     <li class="li"><p class="lil">Blue Team Playbooks</p></li>
   </ul>
@@ -1229,6 +1230,8 @@ ${baseStyles}
 .tab { transition: all .12s; }
 .tab:hover { border-color: var(--text3); }
 .out { flex: 1; background: #0a0a0a; border: 1px solid var(--border); border-radius: var(--r2); padding: 12px; font-family: Consolas,monospace; font-size: 12px; line-height: 1.5; color: #d4d4d4; overflow-y: auto; min-height: 300px; white-space: pre-wrap; }
+#term { flex: 1; min-height: 320px; border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; background: #0a0a0a; padding: 4px; }
+.desktop-link { margin-top: 8px; display: inline-flex; }
 .ipc { display: flex; gap: 8px; margin-top: 12px; }
 .pr { color: var(--accent); font-family: Consolas,monospace; font-size: 12px; white-space: nowrap; }
 .in { background: transparent; border: none; padding: 0; margin: 0; font-family: Consolas,monospace; font-size: 12px; color: #fff; outline: none; flex: 1; min-width: 0; caret-color: #fff; }
@@ -1279,14 +1282,25 @@ ${lab.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}
 <button class="ab" id="prev" onclick="prevStep()" style="display:${step > 0 ? 'inline-flex' : 'none'}">← Previous</button>
 <button class="ab ab-stop" id="stop-attack" onclick="stopAttack()" style="display:${attackActive ? 'inline-flex' : 'none'}; margin-top: 8px;">Stop attack</button>
 <button class="ab" onclick="resetSession()" style="margin-top: 8px;">Reset session</button>
+${lab.id === 'windows-server-2025' ? `<a class="ab desktop-link" href="${appPath(base, '/desktop/windows-server-2025')}">Open Windows desktop UI →</a>` : ''}
 </div>
 <div class="shell">
-<div class="sh"><span class="st2" id="term-label">Terminal (${esc(shellType)})</span><div style="display:flex;gap:8px;">${modeTabs(state.mode)}</div><div style="margin-top:8px;">${shellTabs(shellType)}</div></div>
-<div class="out" id="out"></div>
+<div class="sh"><span class="st2" id="term-label">Terminal (${esc(shellType)}${shellType === 'bash' ? ' · just-bash' : ''})</span><div style="display:flex;gap:8px;">${modeTabs(state.mode)}</div><div style="margin-top:8px;">${shellTabs(shellType)}</div></div>
+${shellType === 'bash' ? '<div id="term"></div>' : '<div class="out" id="out"></div>'}
 </div></div></div></div>
-<script>
+${shellType === 'bash' ? `<script>window.__LAB_BOOT__=${JSON.stringify({
+  base,
+  labId: lab.id,
+  step: state.currentStep,
+  mode: state.mode,
+  shellType: state.shellType,
+  attackActive: state.attackActive,
+  baselineEstablished: state.baselineEstablished,
+  steps: LEARNING_STEPS.bash,
+})};</script>
+<script type="module" src="${appPath(base, '/emulation/linux-lab.js')}"></script>` : `<script>
 ${shellClientScript(lab, state, base)}
-</script>
+</script>`}
 </body></html>`;
 };
 
@@ -1347,13 +1361,26 @@ const dashboardHTML = (base = ''): string => `<!doctype html>
         <h2 class="pt">Training Materials</h2>
         <ul class="list">
           <li class="li"><a href="${appPath(base, '/resources/cyberforce101.pdf.txt')}" class="lil" style="color: var(--accent);">Cyber Force 101 - Course notes</a></li>
-          <li class="li"><a href="${appPath(base, '/resources/windows-server-2025-gui.html')}" class="lil" style="color: var(--accent);">Windows Server 2025 GUI Simulation</a></li>
+          <li class="li"><a href="${appPath(base, '/desktop/windows-server-2025')}" class="lil" style="color: var(--accent);">Windows Server 2025 Desktop UI</a></li>
           <li class="li"><a href="${appPath(base, '/resources/powershell-reference.txt')}" class="lil" style="color: var(--accent);">PowerShell Command Reference</a></li>
           <li class="li"><p class="lil">Blue Team Playbooks</p></li>
         </ul>
       </div>
     </div>
   </div>
+</body>
+</html>`;
+
+const windowsDesktopHTML = (base = ''): string => `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Windows Server 2025 Desktop — Cyberrange</title>
+</head>
+<body>
+  <div id="desktop-root"></div>
+  <script type="module" src="${appPath(base, '/emulation/windows-lab.js')}"></script>
 </body>
 </html>`;
 
@@ -1364,12 +1391,32 @@ const dashboardHTML = (base = ''): string => `<!doctype html>
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const base = getBasePath(url.pathname);
-    const path = stripBasePath(url.pathname, base);
+    const headerBase = request.headers.get('X-Base-Path');
+    const base = headerBase === '/range' ? '/range' : getBasePath(url.pathname);
+    const path =
+      headerBase === '/range'
+        ? url.pathname || '/'
+        : stripBasePath(url.pathname, base);
+
+    // Static emulation bundles (Vite → public/emulation)
+    if (path.startsWith('/emulation/')) {
+      if (env.ASSETS) {
+        const assetUrl = new URL(request.url);
+        assetUrl.pathname = path;
+        return env.ASSETS.fetch(new Request(assetUrl.toString(), request));
+      }
+    }
 
     // Dashboard
     if (path === '/') {
       return new Response(dashboardHTML(base), {
+        headers: { 'Content-Type': 'text/html;charset=UTF-8' },
+      });
+    }
+
+    // Windows desktop UI
+    if (path === '/desktop/windows-server-2025') {
+      return new Response(windowsDesktopHTML(base), {
         headers: { 'Content-Type': 'text/html;charset=UTF-8' },
       });
     }

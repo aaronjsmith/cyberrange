@@ -73,18 +73,11 @@ describe('Cyberrange Worker', () => {
       expect(html).toContain('Observation notepad');
       expect(html).toContain('Stop attack');
       expect(html).toContain('stop-attack');
+      expect(html).toContain('window.__LAB_BOOT__');
+      expect(html).toContain('/emulation/linux-lab.js');
+      expect(html).toContain('id="term"');
       expect(html).not.toContain('contenteditable');
-      expect(html).not.toContain('location.reload');
       expect(html).not.toContain('[object Object]');
-
-      const script = html.match(/<script>\n([\s\S]*?)<\/script>/);
-      expect(script).toBeTruthy();
-      expect(script?.[1]).toContain('replace(/\\s+/g, \' \')');
-      expect(script?.[1]).toContain('blueteam-user@cyberrange:');
-      expect(script?.[1]).toContain("e.key === 'Tab'");
-      expect(script?.[1]).toContain("e.key === 'ArrowUp'");
-      expect(script?.[1]).toContain('function autocomplete');
-      expect(() => new Function(script?.[1] || '')).not.toThrow();
     });
 
     it('should open the Windows Server 2025 lab in PowerShell', async () => {
@@ -481,14 +474,40 @@ describe('Cyberrange Worker', () => {
       expect(html).toContain('href="/range/labs/network-intrusion-baseline"');
     });
 
-    it('should prefix shell client API calls with /range', async () => {
+    it('should boot bash labs with just-bash client bundle', async () => {
       const response = await mockFetch(
         new Request('http://localhost:8787/range/labs/network-intrusion-baseline'),
         {},
       );
       const html = await response.text();
+      expect(html).toContain('window.__LAB_BOOT__');
+      expect(html).toContain('/range/emulation/linux-lab.js');
+      expect(html).toContain('id="term"');
+      expect(html).toContain('just-bash');
+    });
+
+    it('should serve Windows desktop UI route', async () => {
+      const response = await mockFetch(
+        new Request('http://localhost:8787/range/desktop/windows-server-2025'),
+        {},
+      );
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain('desktop-root');
+      expect(html).toContain('/range/emulation/windows-lab.js');
+    });
+
+    it('should honor X-Base-Path for proxied /range mounts', async () => {
+      const response = await mockFetch(
+        new Request('http://localhost:8787/labs/network-intrusion-baseline', {
+          headers: { 'X-Base-Path': '/range' },
+        }),
+        {},
+      );
+      expect(response.status).toBe(200);
+      const html = await response.text();
       expect(html).toContain('"base":"/range"');
-      expect(html).toContain("appPath('/api/labs/' + lid + '/command')");
+      expect(html).toContain('/range/emulation/linux-lab.js');
     });
 
     it('should accept commands at /range/api/...', async () => {

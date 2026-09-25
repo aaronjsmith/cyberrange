@@ -1,34 +1,7 @@
-# Dependencies
+# Build artifacts
+public/emulation/
 node_modules/
-
-# Build output
-dist/
-.dev.vars
-
-# Wrangler
 .wrangler/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Environment
-.env
-.env.local
-.env.*.local
-
-# Logs
+dist/
 *.log
-logs/
-
-# Test coverage
-coverage/
-
-# TypeScript
-*.tsbuildinfo
+.DS_Store
