@@ -5,7 +5,6 @@ export const ATTACKER_IP = '203.0.113.45';
 export const POWERSHELL_COMMANDS: Record<string, string> = {
   whoami: 'cyberrange\\blueteam-user',
   hostname: 'WIN-SRV-2025-01',
-  'Get-Date': new Date().toString(),
   pwd: 'C:\\Users\\blueteam-user',
   'Get-Process':
     'Handles  NPM(K)    PM(K)      WS(K)     CPU(s)     Id  SI ProcessName\n-------  ------    -----      -----     ------     --  -- -----------\n    412      18    12480      22140       0.22   1084   1 explorer\n    220      12     4820       9100       0.05    884   0 services\n    980      45    88200     120400       1.40    712   0 svchost\n    156       8     3200       6100       0.01   4500   1 powershell',
@@ -34,6 +33,9 @@ export const POWERSHELL_COMMANDS: Record<string, string> = {
 
 export function lookupPowerShell(command: string, attackActive: boolean): string | null {
   const normalized = command.trim().replace(/\s+/g, ' ');
+  if (normalized === 'Get-Date') {
+    return new Date().toString();
+  }
   const attackKey = `${normalized} attack`;
   if (attackActive && Object.prototype.hasOwnProperty.call(POWERSHELL_COMMANDS, attackKey)) {
     return POWERSHELL_COMMANDS[attackKey];

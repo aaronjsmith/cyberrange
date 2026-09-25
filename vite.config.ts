@@ -21,6 +21,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         'linux-lab': path.resolve(__dirname, 'client/linux-lab.ts'),
+        'powershell-lab': path.resolve(__dirname, 'client/powershell-lab.ts'),
         'windows-lab': path.resolve(__dirname, 'client/windows-lab.ts'),
       },
       output: {

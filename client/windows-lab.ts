@@ -1,8 +1,17 @@
 import WinBox from 'winbox/src/js/winbox.js';
-import 'winbox/dist/css/winbox.min.css';
+import winboxCss from 'winbox/dist/css/winbox.min.css?inline';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import '@xterm/xterm/css/xterm.css';
+import xtermCss from '@xterm/xterm/css/xterm.css?inline';
+
+function injectCss(css: string): void {
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+}
+
+injectCss(winboxCss);
+injectCss(xtermCss);
 
 import { normalizeCommand } from './lab-session';
 import {
@@ -325,4 +334,11 @@ function main(): void {
   openWindow('ps');
 }
 
-main();
+try {
+  main();
+} catch (err) {
+  const root = document.getElementById('desktop-root') || document.body;
+  const msg = err instanceof Error ? err.message : String(err);
+  root.innerHTML = `<pre style="padding:1rem;color:#fff;background:#5a1a1a;white-space:pre-wrap">Windows desktop failed to load:\n${msg}</pre>`;
+  console.error(err);
+}

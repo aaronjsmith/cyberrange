@@ -1285,20 +1285,30 @@ ${lab.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}
 ${lab.id === 'windows-server-2025' ? `<a class="ab desktop-link" href="${appPath(base, '/desktop/windows-server-2025')}">Open Windows desktop UI →</a>` : ''}
 </div>
 <div class="shell">
-<div class="sh"><span class="st2" id="term-label">Terminal (${esc(shellType)}${shellType === 'bash' ? ' · just-bash' : ''})</span><div style="display:flex;gap:8px;">${modeTabs(state.mode)}</div><div style="margin-top:8px;">${shellTabs(shellType)}</div></div>
-${shellType === 'bash' ? '<div id="term"></div>' : '<div class="out" id="out"></div>'}
+<div class="sh"><span class="st2" id="term-label">Terminal (${esc(shellType)}${shellType === 'bash' ? ' · just-bash' : shellType === 'powershell' ? ' · xterm' : ''})</span><div style="display:flex;gap:8px;">${modeTabs(state.mode)}</div><div style="margin-top:8px;">${shellTabs(shellType)}</div></div>
+${shellType === 'bash' || shellType === 'powershell' ? '<div id="term"></div>' : '<div class="out" id="out"></div>'}
 </div></div></div></div>
 ${shellType === 'bash' ? `<script>window.__LAB_BOOT__=${JSON.stringify({
   base,
   labId: lab.id,
   step: state.currentStep,
   mode: state.mode,
-  shellType: state.shellType,
+  shellType: 'bash',
   attackActive: state.attackActive,
   baselineEstablished: state.baselineEstablished,
   steps: LEARNING_STEPS.bash,
 })};</script>
-<script type="module" src="${appPath(base, '/emulation/linux-lab.js')}"></script>` : `<script>
+<script type="module" src="${appPath(base, '/emulation/linux-lab.js')}"></script>` : shellType === 'powershell' ? `<script>window.__LAB_BOOT__=${JSON.stringify({
+  base,
+  labId: lab.id,
+  step: state.currentStep,
+  mode: state.mode,
+  shellType: 'powershell',
+  attackActive: state.attackActive,
+  baselineEstablished: state.baselineEstablished,
+  steps: LEARNING_STEPS.powershell,
+})};</script>
+<script type="module" src="${appPath(base, '/emulation/powershell-lab.js')}"></script>` : `<script>
 ${shellClientScript(lab, state, base)}
 </script>`}
 </body></html>`;

@@ -90,8 +90,11 @@ describe('Cyberrange Worker', () => {
 
       expect(response.status).toBe(200);
       expect(html).toContain('Windows Server 2025 Hardening');
-      expect(html).toContain('Terminal (powershell)');
-      expect(html).toContain('PS C:\\\\Users\\\\blueteam-user>');
+      expect(html).toContain('Terminal (powershell · xterm)');
+      expect(html).toContain('window.__LAB_BOOT__');
+      expect(html).toContain('/emulation/powershell-lab.js');
+      expect(html).toContain('id="term"');
+      expect(html).toContain('Open Windows desktop UI');
     });
 
     it('should return 404 for unknown lab', async () => {

@@ -1,4 +1,3 @@
-import { Bash, defineCommand } from 'just-bash/browser';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import xtermCss from '@xterm/xterm/css/xterm.css?inline';
@@ -17,80 +16,7 @@ import {
   writeStore,
   type LabBoot,
 } from './lab-session';
-import {
-  ATTACK_AUTH_LOG,
-  BASH_LAB_NOTES,
-  HOME,
-  HOST,
-  NETSTAT,
-  PS_AUX,
-  PS_AUX_ATTACK,
-  QUIET_AUTH_LOG,
-  USER,
-  buildLinuxFiles,
-  topOutput,
-} from './scenario/linux';
-
-function formatPrompt(cwd: string): string {
-  let shown = cwd || HOME;
-  if (shown === HOME) shown = '~';
-  else if (shown.startsWith(`${HOME}/`)) shown = `~${shown.slice(HOME.length)}`;
-  return `${USER}@cyberrange:${shown}$ `;
-}
-
-function createBash(attackActive: boolean): Bash {
-  let attack = attackActive;
-
-  const ps = defineCommand('ps', async (args) => {
-    const joined = args.join(' ');
-    if (joined.includes('aux') || args.length === 0) {
-      return { stdout: `${attack ? PS_AUX_ATTACK : PS_AUX}\n`, stderr: '', exitCode: 0 };
-    }
-    return { stdout: `${attack ? PS_AUX_ATTACK : PS_AUX}\n`, stderr: '', exitCode: 0 };
-  });
-
-  const netstat = defineCommand('netstat', async () => ({
-    stdout: `${NETSTAT}\n`,
-    stderr: '',
-    exitCode: 0,
-  }));
-
-  const ss = defineCommand('ss', async () => ({
-    stdout: `${NETSTAT}\n`,
-    stderr: '',
-    exitCode: 0,
-  }));
-
-  const top = defineCommand('top', async () => ({
-    stdout: `${topOutput(attack)}\n`,
-    stderr: '',
-    exitCode: 0,
-  }));
-
-  const bash = new Bash({
-    files: buildLinuxFiles(attackActive),
-    cwd: HOME,
-    env: {
-      HOME,
-      USER,
-      LOGNAME: USER,
-      HOSTNAME: HOST,
-      PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-    },
-    customCommands: [ps, netstat, ss, top],
-  });
-
-  (bash as Bash & { __setAttack?: (v: boolean) => void }).__setAttack = (v: boolean) => {
-    attack = v;
-  };
-
-  return bash;
-}
-
-async function writeAuthLog(bash: Bash, attackActive: boolean): Promise<void> {
-  const content = attackActive ? ATTACK_AUTH_LOG : QUIET_AUTH_LOG;
-  await bash.exec(`cat > /var/log/auth.log << 'EOF'\n${content}\nEOF`);
-}
+import { lookupPowerShell } from './scenario/powershell';
 
 function updateSidebar(boot: LabBoot): void {
   const steps = boot.steps;
@@ -160,8 +86,7 @@ function syncUrl(boot: LabBoot): void {
     attack: boot.attackActive ? 'true' : 'false',
     baseline: boot.baselineEstablished ? 'true' : 'false',
   });
-  const url = `${boot.base}/labs/${boot.labId}?${params.toString()}`;
-  history.replaceState(null, '', url);
+  history.replaceState(null, '', `${boot.base}/labs/${boot.labId}?${params.toString()}`);
 }
 
 function persist(boot: LabBoot, history: string[], observations: string): void {
@@ -178,6 +103,7 @@ function persist(boot: LabBoot, history: string[], observations: string): void {
 
 async function main(): Promise<void> {
   const boot = getBoot();
+  boot.shellType = 'powershell';
   const stored = readStore(boot.labId);
   const params = new URLSearchParams(location.search);
   const explicit =
@@ -207,9 +133,9 @@ async function main(): Promise<void> {
     fontFamily: 'Consolas, "IBM Plex Mono", monospace',
     fontSize: 13,
     theme: {
-      background: '#0a0a0a',
-      foreground: '#d4d4d4',
-      cursor: '#4ade80',
+      background: '#012456',
+      foreground: '#f3f3f3',
+      cursor: '#f3f3f3',
       selectionBackground: '#264f78',
     },
   });
@@ -219,103 +145,79 @@ async function main(): Promise<void> {
   fit.fit();
   window.addEventListener('resize', () => fit.fit());
 
-  let bash = createBash(boot.attackActive);
-  let cwd = HOME;
   let history: string[] = Array.isArray(stored?.commandHistory) ? stored!.commandHistory! : [];
   let line = '';
-  let browsing = -1;
-  let draft = '';
-
-  const prompt = () => formatPrompt(cwd);
+  const prompt = 'PS C:\\Users\\blueteam-user> ';
 
   const writeln = (text: string) => {
-    const lines = text.replace(/\r\n/g, '\n').split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      if (i === lines.length - 1 && lines[i] === '') continue;
-      term.writeln(lines[i]);
+    for (const row of text.replace(/\r\n/g, '\n').split('\n')) {
+      if (row === '' && text.endsWith('\n')) continue;
+      term.writeln(row);
     }
   };
 
   const showPrompt = () => {
-    term.write(`\r\n\x1b[32m${prompt()}\x1b[0m`);
+    term.write(`\r\n\x1b[36m${prompt}\x1b[0m`);
   };
 
-  term.writeln('Linux Terminal (just-bash + xterm). Type help, then try ls, cd, pwd, and cat.');
+  term.writeln('Windows PowerShell — Cyberrange simulation (xterm)');
+  term.writeln('Type help, then whoami / hostname / Get-Date. Use baseline → start-attack → stop-attack.');
   updateSidebar(boot);
   showPrompt();
   term.focus();
 
-  const rebuildBash = async () => {
-    bash = createBash(boot.attackActive);
-    await writeAuthLog(bash, boot.attackActive);
-    const setter = (bash as Bash & { __setAttack?: (v: boolean) => void }).__setAttack;
-    setter?.(boot.attackActive);
-  };
+  const execute = (raw: string) => {
+    const cmd = normalizeCommand(raw);
+    if (!cmd) {
+      showPrompt();
+      return;
+    }
+    history.push(cmd);
 
-  const runSpecial = async (cmd: string): Promise<string | null> => {
-    if (cmd === 'baseline') {
-      boot.baselineEstablished = true;
-      return BASH_LAB_NOTES.baseline;
-    }
-    if (cmd === 'start-attack') {
-      if (!boot.baselineEstablished) {
-        return 'Establish a baseline first (type: baseline).';
-      }
-      boot.attackActive = true;
-      await rebuildBash();
-      return BASH_LAB_NOTES['start-attack'];
-    }
-    if (cmd === 'stop-attack') {
-      boot.attackActive = false;
-      await rebuildBash();
-      return BASH_LAB_NOTES['stop-attack'];
-    }
-    if (cmd === 'lab-info') return BASH_LAB_NOTES['lab-info'];
-    if (cmd === 'clear' || cmd === 'Clear-Host' || cmd === 'cls') {
+    if (cmd === 'Clear-Host' || cmd === 'cls' || cmd === 'clear') {
       term.clear();
-      return '';
+      showPrompt();
+      return;
     }
+
     if (cmd.startsWith('shell-type ')) {
       const next = cmd.slice('shell-type '.length);
-      if (next === 'powershell' || next === 'bash') {
-        const params = new URLSearchParams({
+      if (next === 'bash' || next === 'powershell') {
+        const q = new URLSearchParams({
           mode: boot.mode,
           step: String(boot.step),
           shellType: next,
           attack: String(boot.attackActive),
           baseline: String(boot.baselineEstablished),
         });
-        location.href = `${boot.base}/labs/${boot.labId}?${params.toString()}`;
-        return null;
+        location.href = `${boot.base}/labs/${boot.labId}?${q.toString()}`;
+        return;
       }
-      return `Unknown shell type: ${next}. Use 'bash' or 'powershell'.`;
-    }
-    return null;
-  };
-
-  const execute = async (raw: string) => {
-    const cmd = normalizeCommand(raw);
-    if (!cmd) {
+      writeln(`Unknown shell type: ${next}. Use 'bash' or 'powershell'.`);
       showPrompt();
       return;
     }
 
-    history.push(cmd);
-    browsing = -1;
-
-    const special = await runSpecial(cmd);
-    if (special !== null) {
-      if (special) writeln(special);
+    if (cmd === 'baseline') {
+      boot.baselineEstablished = true;
+      writeln(lookupPowerShell('baseline', false) || '');
+    } else if (cmd === 'start-attack') {
+      if (!boot.baselineEstablished) {
+        writeln('Establish a baseline first (type: baseline).');
+      } else {
+        boot.attackActive = true;
+        writeln(lookupPowerShell('start-attack', true) || '');
+      }
+    } else if (cmd === 'stop-attack') {
+      boot.attackActive = false;
+      writeln(lookupPowerShell('stop-attack', false) || '');
     } else {
-      try {
-        const result = await bash.exec(cmd);
-        if (result.stdout) writeln(result.stdout.replace(/\n$/, ''));
-        if (result.stderr) writeln(`\x1b[31m${result.stderr.replace(/\n$/, '')}\x1b[0m`);
-        // Refresh cwd from a pwd exec
-        const pwd = await bash.exec('pwd');
-        cwd = (pwd.stdout || HOME).trim() || HOME;
-      } catch (err) {
-        writeln(`\x1b[31m${err instanceof Error ? err.message : String(err)}\x1b[0m`);
+      const out = lookupPowerShell(cmd, boot.attackActive);
+      if (out == null) {
+        writeln(`Command not recognized in this simulation: ${cmd}`);
+        writeln('Type help for available commands.');
+      } else {
+        writeln(out);
       }
     }
 
@@ -332,106 +234,59 @@ async function main(): Promise<void> {
   };
 
   term.onData((data) => {
-    for (const ch of data) {
-      if (ch === '\r') {
-        term.write('\r\n');
-        const current = line;
-        line = '';
-        void execute(current);
-        continue;
+    if (data === '\r') {
+      term.write('\r\n');
+      const current = line;
+      line = '';
+      execute(current);
+      return;
+    }
+    if (data === '\u007f') {
+      if (line.length) {
+        line = line.slice(0, -1);
+        term.write('\b \b');
       }
-      if (ch === '\u007f') {
-        if (line.length > 0) {
-          line = line.slice(0, -1);
-          term.write('\b \b');
-        }
-        continue;
-      }
-      if (ch === '\u0003') {
-        term.write('^C');
-        line = '';
-        showPrompt();
-        continue;
-      }
-      if (ch === '\u001b') {
-        // ignore bare esc
-        continue;
-      }
-      // arrow up/down: ESC [ A / B
-      if (data.includes('\u001b[A')) {
-        if (history.length === 0) return;
-        if (browsing === -1) draft = line;
-        browsing = browsing === -1 ? history.length - 1 : Math.max(0, browsing - 1);
-        while (line.length) {
-          line = line.slice(0, -1);
-          term.write('\b \b');
-        }
-        line = history[browsing] || '';
-        term.write(line);
-        return;
-      }
-      if (data.includes('\u001b[B')) {
-        if (browsing === -1) return;
-        browsing += 1;
-        while (line.length) {
-          line = line.slice(0, -1);
-          term.write('\b \b');
-        }
-        if (browsing >= history.length) {
-          browsing = -1;
-          line = draft;
-        } else {
-          line = history[browsing] || '';
-        }
-        term.write(line);
-        return;
-      }
-      if (ch >= ' ' || ch === '\t') {
-        line += ch;
-        term.write(ch);
-      }
+      return;
+    }
+    if (data === '\u0003') {
+      term.write('^C');
+      line = '';
+      showPrompt();
+      return;
+    }
+    if (data.length === 1 && data >= ' ') {
+      line += data;
+      term.write(data);
     }
   });
 
-  document.getElementById('stop-attack')?.addEventListener('click', () => {
-    void execute('stop-attack');
-  });
-
+  document.getElementById('stop-attack')?.addEventListener('click', () => execute('stop-attack'));
   document.getElementById('prev')?.addEventListener('click', () => {
     boot.step = Math.max(0, boot.step - 1);
     updateSidebar(boot);
     syncUrl(boot);
     persist(boot, history, notes?.value || '');
   });
-
-  notes?.addEventListener('input', () => {
-    persist(boot, history, notes.value);
-  });
+  notes?.addEventListener('input', () => persist(boot, history, notes.value));
 
   (window as unknown as { setMode: (m: string) => void }).setMode = (mode: string) => {
     boot.mode = mode === 'free' ? 'free' : 'learning';
     syncUrl(boot);
     location.reload();
   };
-
   (window as unknown as { setShellType: (s: string) => void }).setShellType = (shell: string) => {
-    void execute(`shell-type ${shell}`);
+    execute(`shell-type ${shell}`);
   };
-
   (window as unknown as { resetSession: () => void }).resetSession = () => {
     if (confirm('Reset this lab session? All command history and progress will be cleared.')) {
       localStorage.removeItem(`cyberrange-session-${boot.labId}`);
       location.href = `${boot.base}/labs/${boot.labId}`;
     }
   };
-
   (window as unknown as { prevStep: () => void }).prevStep = () => {
     document.getElementById('prev')?.click();
   };
-
-  (window as unknown as { stopAttack: () => void }).stopAttack = () => {
-    void execute('stop-attack');
-  };
+  (window as unknown as { stopAttack: () => void }).stopAttack = () => execute('stop-attack');
 }
 
 void main();
