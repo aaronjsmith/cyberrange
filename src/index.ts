@@ -77,6 +77,32 @@ const LABS: Lab[] = [
   },
 ];
 
+// Mounted under cyber.ensign.quest/range via CyberEnforcer service binding.
+const MOUNT_PREFIX = '/range';
+
+const getBasePath = (pathname: string): string => {
+  if (pathname === MOUNT_PREFIX || pathname.startsWith(`${MOUNT_PREFIX}/`)) {
+    return MOUNT_PREFIX;
+  }
+  return '';
+};
+
+const stripBasePath = (pathname: string, base: string): string => {
+  if (!base) return pathname;
+  if (pathname === base) return '/';
+  if (pathname.startsWith(`${base}/`)) {
+    const rest = pathname.slice(base.length);
+    return rest || '/';
+  }
+  return pathname;
+};
+
+const appPath = (base: string, path: string): string => {
+  if (path === '/' || path === '') return base || '/';
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${normalized}`;
+};
+
 // Helper to escape HTML
 const esc = (t: string): string => {
   return t
@@ -516,11 +542,11 @@ const getWelcomeMessage = (shellType: ShellType): string => {
   return 'Linux Terminal. Type help, then try ls, cd, pwd, and cat.';
 };
 
-const labsIndexHTML = (): string => {
+const labsIndexHTML = (base = ''): string => {
   const cards = LABS.map(l => {
     const c = { Beginner: '#4ade80', Intermediate: '#fbbf24', Advanced: '#f87171' }[l.difficulty];
     return `
-<a href="/labs/${l.id}" class="panel" style="text-decoration:none;color:inherit">
+<a href="${appPath(base, `/labs/${l.id}`)}" class="panel" style="text-decoration:none;color:inherit">
   <p class="kicker">${l.category}</p>
   <h2 class="pt">${l.title}</h2>
   <p class="cap">${l.description}</p>
@@ -536,9 +562,9 @@ const labsIndexHTML = (): string => {
 <title>Select Lab - Cyberrange</title><style>${baseStyles}</style>
 </head><body>
 <div class="bar"><div class="brand"><div><h1 class="t">Cyberrange</h1><p class="st">Blue Team Training</p></div></div>
-<div><a href="/" class="btn">Dashboard</a></div></div>
+<div><a href="${appPath(base, '/')}" class="btn">Dashboard</a></div></div>
 <div class="container"><div class="main">
-<a href="/" class="back">← Back</a>
+<a href="${appPath(base, '/')}" class="back">← Back</a>
 <div class="panel"><p class="kicker">Blue Team</p><h2 class="pt">Available Labs</h2>
 <p class="cap">Select a lab. Each includes learning mode with baseline → attack simulation.</p></div>
 <div class="grid">${cards}</div>
@@ -546,9 +572,9 @@ const labsIndexHTML = (): string => {
   <p class="kicker">Resources</p>
   <h2 class="pt">Training Materials</h2>
   <ul class="list">
-    <li class="li"><a href="/resources/cyberforce101.pdf.txt" class="lil" style="color: var(--accent);">Cyber Force 101 - Course notes</a></li>
-    <li class="li"><a href="/resources/windows-server-2025-gui.html" class="lil" style="color: var(--accent);">Windows Server 2025 GUI Simulation</a></li>
-    <li class="li"><a href="/resources/powershell-reference.txt" class="lil" style="color: var(--accent);">PowerShell Command Reference</a></li>
+    <li class="li"><a href="${appPath(base, '/resources/cyberforce101.pdf.txt')}" class="lil" style="color: var(--accent);">Cyber Force 101 - Course notes</a></li>
+    <li class="li"><a href="${appPath(base, '/resources/windows-server-2025-gui.html')}" class="lil" style="color: var(--accent);">Windows Server 2025 GUI Simulation</a></li>
+    <li class="li"><a href="${appPath(base, '/resources/powershell-reference.txt')}" class="lil" style="color: var(--accent);">PowerShell Command Reference</a></li>
     <li class="li"><p class="lil">Blue Team Playbooks</p></li>
   </ul>
 </div>
@@ -556,9 +582,10 @@ const labsIndexHTML = (): string => {
 </body></html>`;
 };
 
-const shellClientScript = (lab: Lab, state: ShellState): string => String.raw`
+const shellClientScript = (lab: Lab, state: ShellState, base = ''): string => String.raw`
 const BOOT = ${JSON.stringify({
   labId: lab.id,
+  base,
   step: state.currentStep,
   mode: state.mode,
   shellType: state.shellType,
@@ -567,6 +594,10 @@ const BOOT = ${JSON.stringify({
   cwd: state.cwd || '/home/blueteam-user',
   filesystem: state.shellType === 'bash' ? (state.filesystem || createDefaultFilesystem(state.attackActive)) : null,
 })};
+const BASE = BOOT.base || '';
+function appPath(path) {
+  return BASE + path;
+}
 const STEPS = ${JSON.stringify(LEARNING_STEPS)};
 const PROMPTS = ${JSON.stringify({
   bash: getShellPrompt('bash'),
@@ -649,7 +680,7 @@ function labQuery() {
 }
 
 function syncUrl() {
-  history.replaceState(null, '', '/labs/' + lid + labQuery());
+  history.replaceState(null, '', appPath('/labs/' + lid) + labQuery());
 }
 
 function formatBashPrompt(path) {
@@ -921,26 +952,26 @@ function paint() {
 function resetSession() {
   if (confirm('Reset this lab session? All command history and progress will be cleared.')) {
     localStorage.removeItem(storageKey());
-    window.location.href = '/labs/' + lid;
+    window.location.href = appPath('/labs/' + lid);
   }
 }
 
 function setMode(mode) {
   m = mode;
   saveSession();
-  window.location.href = '/labs/' + lid + labQuery();
+  window.location.href = appPath('/labs/' + lid) + labQuery();
 }
 
 function setShellType(shell) {
   st = shell;
   saveSession();
-  window.location.href = '/labs/' + lid + labQuery();
+  window.location.href = appPath('/labs/' + lid) + labQuery();
 }
 
 function prevStep() {
   s = Math.max(0, s - 1);
   saveSession();
-  window.location.href = '/labs/' + lid + labQuery();
+  window.location.href = appPath('/labs/' + lid) + labQuery();
 }
 
 async function stopAttack() {
@@ -971,7 +1002,7 @@ async function exec(input) {
 
   let data = null;
   try {
-    const r = await fetch('/api/labs/' + lid + '/command', {
+    const r = await fetch(appPath('/api/labs/' + lid + '/command'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1036,7 +1067,7 @@ async function exec(input) {
     filesystem = null;
     cwd = '/home/blueteam-user';
     saveSession();
-    window.location.href = '/labs/' + lid + labQuery();
+    window.location.href = appPath('/labs/' + lid) + labQuery();
     return;
   }
 
@@ -1059,7 +1090,7 @@ function boot() {
     if (typeof stored.cwd === 'string') cwd = stored.cwd;
     const drift = st !== BOOT.shellType || m !== BOOT.mode || s !== BOOT.step || a !== BOOT.attackActive || b !== BOOT.baselineEstablished;
     if (drift) {
-      window.location.replace('/labs/' + lid + labQuery());
+      window.location.replace(appPath('/labs/' + lid) + labQuery());
       return;
     }
   }
@@ -1156,7 +1187,7 @@ if (o) {
 boot();
 `;
 
-const shellHTML = (lab: Lab, state: ShellState): string => {
+const shellHTML = (lab: Lab, state: ShellState, base = ''): string => {
   const { attackActive, baselineEstablished, shellType } = state;
   const step = state.currentStep;
   const steps = LEARNING_STEPS[shellType];
@@ -1212,9 +1243,9 @@ ${baseStyles}
 </style>
 </head><body>
 <div class="bar"><div class="brand"><div><h1 class="t">${lab.title}</h1><p class="st">${lab.category} • ${lab.difficulty}</p></div></div>
-<div><a href="/labs" class="btn">All Labs</a></div></div>
+<div><a href="${appPath(base, '/labs')}" class="btn">All Labs</a></div></div>
 <div class="container"><div class="main">
-<a href="/labs" class="back">← All Labs</a>
+<a href="${appPath(base, '/labs')}" class="back">← All Labs</a>
 <div class="lab">
 <div class="sidebar">
 <p class="kicker" id="mode-kicker">${state.mode === 'free' ? 'Free Mode' : 'Learning Mode'}</p><h3 style="margin:6px 0 2px;font-size:14px;font-weight:700">Progress</h3>
@@ -1254,12 +1285,12 @@ ${lab.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}
 <div class="out" id="out"></div>
 </div></div></div></div>
 <script>
-${shellClientScript(lab, state)}
+${shellClientScript(lab, state, base)}
 </script>
 </body></html>`;
 };
 
-const DASHBOARD_HTML = `<!doctype html>
+const dashboardHTML = (base = ''): string => `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -1275,7 +1306,7 @@ const DASHBOARD_HTML = `<!doctype html>
         <p class="st">Blue Team Training Platform</p>
       </div>
     </div>
-    <div><a href="/labs" class="btn">Labs</a></div>
+    <div><a href="${appPath(base, '/labs')}" class="btn">Labs</a></div>
   </div>
   <div class="container">
     <div class="main">
@@ -1289,7 +1320,7 @@ const DASHBOARD_HTML = `<!doctype html>
           <p class="kicker">Quick Start</p>
           <h2 class="pt">New to Cyberrange?</h2>
           <p class="cap">Browse our available labs to start your blue team training journey.</p>
-          <a href="/labs" class="btn" style="margin-top: 12px; display: inline-block;">Browse Labs</a>
+          <a href="${appPath(base, '/labs')}" class="btn" style="margin-top: 12px; display: inline-block;">Browse Labs</a>
         </div>
         <div class="panel">
           <p class="kicker">Features</p>
@@ -1315,9 +1346,9 @@ const DASHBOARD_HTML = `<!doctype html>
         <p class="kicker">Resources</p>
         <h2 class="pt">Training Materials</h2>
         <ul class="list">
-          <li class="li"><a href="/resources/cyberforce101.pdf.txt" class="lil" style="color: var(--accent);">Cyber Force 101 - Course notes</a></li>
-          <li class="li"><a href="/resources/windows-server-2025-gui.html" class="lil" style="color: var(--accent);">Windows Server 2025 GUI Simulation</a></li>
-          <li class="li"><a href="/resources/powershell-reference.txt" class="lil" style="color: var(--accent);">PowerShell Command Reference</a></li>
+          <li class="li"><a href="${appPath(base, '/resources/cyberforce101.pdf.txt')}" class="lil" style="color: var(--accent);">Cyber Force 101 - Course notes</a></li>
+          <li class="li"><a href="${appPath(base, '/resources/windows-server-2025-gui.html')}" class="lil" style="color: var(--accent);">Windows Server 2025 GUI Simulation</a></li>
+          <li class="li"><a href="${appPath(base, '/resources/powershell-reference.txt')}" class="lil" style="color: var(--accent);">PowerShell Command Reference</a></li>
           <li class="li"><p class="lil">Blue Team Playbooks</p></li>
         </ul>
       </div>
@@ -1333,18 +1364,19 @@ const DASHBOARD_HTML = `<!doctype html>
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const path = url.pathname;
+    const base = getBasePath(url.pathname);
+    const path = stripBasePath(url.pathname, base);
 
     // Dashboard
     if (path === '/') {
-      return new Response(DASHBOARD_HTML, {
+      return new Response(dashboardHTML(base), {
         headers: { 'Content-Type': 'text/html;charset=UTF-8' },
       });
     }
 
     // Labs index
     if (path === '/labs') {
-      return new Response(labsIndexHTML(), {
+      return new Response(labsIndexHTML(base), {
         headers: { 'Content-Type': 'text/html;charset=UTF-8' },
       });
     }
@@ -1380,7 +1412,7 @@ export default {
         filesystem: null,
       };
 
-      return new Response(shellHTML(lab, state), {
+      return new Response(shellHTML(lab, state, base), {
         headers: { 'Content-Type': 'text/html;charset=UTF-8' },
       });
     }
@@ -1439,8 +1471,8 @@ export default {
           name: 'Cyberrange API',
           version: '1.0.0',
           endpoints: {
-            health: '/health',
-            labs: '/labs',
+            health: appPath(base, '/health'),
+            labs: appPath(base, '/labs'),
           },
         }),
         { headers: { 'Content-Type': 'application/json' } }

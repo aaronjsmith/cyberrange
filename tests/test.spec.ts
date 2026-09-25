@@ -463,4 +463,46 @@ describe('Cyberrange Worker', () => {
       expect(response.status).toBe(404);
     });
   });
+
+  describe('Mounted /range paths', () => {
+    it('should serve dashboard under /range', async () => {
+      const response = await mockFetch(new Request('http://localhost:8787/range'), {});
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain('Cyberrange Dashboard');
+      expect(html).toContain('href="/range/labs"');
+    });
+
+    it('should serve labs index under /range/labs', async () => {
+      const response = await mockFetch(new Request('http://localhost:8787/range/labs'), {});
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain('Available Labs');
+      expect(html).toContain('href="/range/labs/network-intrusion-baseline"');
+    });
+
+    it('should prefix shell client API calls with /range', async () => {
+      const response = await mockFetch(
+        new Request('http://localhost:8787/range/labs/network-intrusion-baseline'),
+        {},
+      );
+      const html = await response.text();
+      expect(html).toContain('"base":"/range"');
+      expect(html).toContain("appPath('/api/labs/' + lid + '/command')");
+    });
+
+    it('should accept commands at /range/api/...', async () => {
+      const response = await mockFetch(
+        new Request('http://localhost:8787/range/api/labs/network-intrusion-baseline/command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: 'whoami', shellType: 'bash' }),
+        }),
+        {},
+      );
+      expect(response.status).toBe(200);
+      const json = await response.json();
+      expect(json.output).toContain('blueteam');
+    });
+  });
 });
