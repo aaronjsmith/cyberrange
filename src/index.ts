@@ -1411,10 +1411,20 @@ export default {
     // Static emulation bundles (Vite → public/emulation)
     if (path.startsWith('/emulation/')) {
       if (env.ASSETS) {
-        const assetUrl = new URL(request.url);
-        assetUrl.pathname = path;
-        return env.ASSETS.fetch(new Request(assetUrl.toString(), request));
+        // Serve by path only so service-binding hosts still resolve assets.
+        const assetRequest = new Request(new URL(path, 'https://assets'), {
+          method: request.method,
+          headers: request.headers,
+        });
+        const assetResponse = await env.ASSETS.fetch(assetRequest);
+        if (assetResponse.status !== 404) {
+          return assetResponse;
+        }
       }
+      return new Response(`Emulation asset not found: ${path}`, {
+        status: 404,
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      });
     }
 
     // Dashboard

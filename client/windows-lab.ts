@@ -4,6 +4,13 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import xtermCss from '@xterm/xterm/css/xterm.css?inline';
 
+import { normalizeCommand } from './lab-session';
+import {
+  SECURITY_EVENTS_ATTACK,
+  SECURITY_EVENTS_QUIET,
+  lookupPowerShell,
+} from './scenario/powershell';
+
 function injectCss(css: string): void {
   const style = document.createElement('style');
   style.textContent = css;
@@ -12,14 +19,6 @@ function injectCss(css: string): void {
 
 injectCss(winboxCss);
 injectCss(xtermCss);
-
-import { normalizeCommand } from './lab-session';
-import {
-  SECURITY_EVENTS_ATTACK,
-  SECURITY_EVENTS_QUIET,
-  lookupPowerShell,
-} from './scenario/powershell';
-
 interface DesktopState {
   attackActive: boolean;
   baselineEstablished: boolean;
