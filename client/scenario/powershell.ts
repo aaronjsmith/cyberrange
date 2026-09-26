@@ -47,14 +47,63 @@ export function lookupPowerShell(command: string, attackActive: boolean): string
 }
 
 export const SECURITY_EVENTS_QUIET = [
-  { time: '9/23/2026 7:40:01 PM', id: '4624', level: 'Information', message: 'An account was successfully logged on' },
-  { time: '9/23/2026 7:39:12 PM', id: '4624', level: 'Information', message: 'An account was successfully logged on' },
-  { time: '9/23/2026 7:38:00 PM', id: '4634', level: 'Information', message: 'An account was logged off' },
+  {
+    time: '9/23/2026 7:40:01 PM',
+    id: '4624',
+    level: 'Information',
+    source: 'Microsoft-Windows-Security-Auditing',
+    task: 'Logon',
+    message: 'An account was successfully logged on',
+  },
+  {
+    time: '9/23/2026 7:39:12 PM',
+    id: '4624',
+    level: 'Information',
+    source: 'Microsoft-Windows-Security-Auditing',
+    task: 'Logon',
+    message: 'An account was successfully logged on',
+  },
+  {
+    time: '9/23/2026 7:38:00 PM',
+    id: '4634',
+    level: 'Information',
+    source: 'Microsoft-Windows-Security-Auditing',
+    task: 'Logoff',
+    message: 'An account was logged off',
+  },
 ];
 
 export const SECURITY_EVENTS_ATTACK = [
-  { time: '9/23/2026 7:46:06 PM', id: '4625', level: 'Failure', message: `Account failed to log on from ${ATTACKER_IP} (RDP)` },
-  { time: '9/23/2026 7:46:05 PM', id: '4625', level: 'Failure', message: `Account failed to log on from ${ATTACKER_IP} (RDP)` },
-  { time: '9/23/2026 7:46:04 PM', id: '4625', level: 'Failure', message: `Account failed to log on from ${ATTACKER_IP} (RDP)` },
-  { time: '9/23/2026 7:40:01 PM', id: '4624', level: 'Information', message: 'An account was successfully logged on' },
+  {
+    time: '9/23/2026 7:46:06 PM',
+    id: '4625',
+    level: 'Failure',
+    source: 'Microsoft-Windows-Security-Auditing',
+    task: 'Logon',
+    message: `Account failed to log on from ${ATTACKER_IP} (RDP)`,
+  },
+  {
+    time: '9/23/2026 7:46:05 PM',
+    id: '4625',
+    level: 'Failure',
+    source: 'Microsoft-Windows-Security-Auditing',
+    task: 'Logon',
+    message: `Account failed to log on from ${ATTACKER_IP} (RDP)`,
+  },
+  {
+    time: '9/23/2026 7:46:04 PM',
+    id: '4625',
+    level: 'Failure',
+    source: 'Microsoft-Windows-Security-Auditing',
+    task: 'Logon',
+    message: `Account failed to log on from ${ATTACKER_IP} (RDP)`,
+  },
+  {
+    time: '9/23/2026 7:40:01 PM',
+    id: '4624',
+    level: 'Information',
+    source: 'Microsoft-Windows-Security-Auditing',
+    task: 'Logon',
+    message: 'An account was successfully logged on',
+  },
 ];
