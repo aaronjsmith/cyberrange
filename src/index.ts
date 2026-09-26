@@ -527,6 +527,19 @@ body { font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;
 .list { flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; display: flex; }
 .li { border: 1px solid var(--border); border-radius: var(--r2); background: var(--bg3); padding: 8px 10px; }
 .lil { color: var(--text); overflow-wrap: anywhere; word-break: break-word; margin: 0; font-size: 13px; font-weight: 600; line-height: 1.35; }
+.lil a { color: var(--accent); }
+.section-gap { margin-top: 20px; }
+.prose { color: var(--text2); font-size: 14px; line-height: 1.55; margin: 0 0 12px; }
+.prose a { color: var(--accent); }
+.sub { font-size: 14px; margin: 16px 0 8px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 12px; }
+.fact { border: 1px solid var(--border); border-radius: var(--r2); background: var(--bg3); padding: 10px 12px; }
+.fact strong { display: block; letter-spacing: .08em; text-transform: uppercase; color: var(--text3); margin-bottom: 4px; font-size: 10px; }
+.fact span { font-size: 13px; line-height: 1.4; }
+.sched { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+.sched th, .sched td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; overflow-wrap: anywhere; }
+.sched th { color: var(--text3); letter-spacing: .08em; text-transform: uppercase; font-size: 10px; }
+.mono { background: var(--bg3); padding: 1px 6px; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; overflow-wrap: anywhere; }
 `;
 
 const getShellPrompt = (shellType: ShellType, cwd = '/home/blueteam-user'): string => {
@@ -563,7 +576,7 @@ const labsIndexHTML = (base = ''): string => {
 <title>Select Lab - Cyberrange</title><style>${baseStyles}</style>
 </head><body>
 <div class="bar"><div class="brand"><div><h1 class="t">Cyberrange</h1><p class="st">Blue Team Training</p></div></div>
-<div><a href="${appPath(base, '/')}" class="btn">Dashboard</a></div></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap"><a href="${appPath(base, '/competition/2025')}" class="btn">2025 Overview</a><a href="${appPath(base, '/')}" class="btn">Dashboard</a></div></div>
 <div class="container"><div class="main">
 <a href="${appPath(base, '/')}" class="back">← Back</a>
 <div class="panel"><p class="kicker">Blue Team</p><h2 class="pt">Available Labs</h2>
@@ -573,6 +586,7 @@ const labsIndexHTML = (base = ''): string => {
   <p class="kicker">Resources</p>
   <h2 class="pt">Training Materials</h2>
   <ul class="list">
+    <li class="li"><a href="${appPath(base, '/competition/2025')}" class="lil" style="color: var(--accent);">2025 Competition Overview</a></li>
     <li class="li"><a href="${appPath(base, '/resources/cyberforce101.pdf.txt')}" class="lil" style="color: var(--accent);">Cyber Force 101 - Course notes</a></li>
     <li class="li"><a href="${appPath(base, '/desktop/windows-server-2025')}" class="lil" style="color: var(--accent);">Windows Server 2025 Desktop UI</a></li>
     <li class="li"><a href="${appPath(base, '/resources/powershell-reference.txt')}" class="lil" style="color: var(--accent);">PowerShell Command Reference</a></li>
@@ -1314,6 +1328,211 @@ ${shellClientScript(lab, state, base)}
 </body></html>`;
 };
 
+const competitionOverviewHTML = (base = ''): string => `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2025 Competition Overview — Cyberrange</title>
+  <style>${baseStyles}</style>
+</head>
+<body>
+  <div class="bar">
+    <div class="brand">
+      <div>
+        <h1 class="t">2025 Competition Overview</h1>
+        <p class="st">CyberForce Competition® · Department of Energy</p>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a href="${appPath(base, '/')}" class="btn">Dashboard</a>
+      <a href="${appPath(base, '/labs')}" class="btn">Labs</a>
+    </div>
+  </div>
+  <div class="container">
+    <div class="main">
+      <a href="${appPath(base, '/')}" class="back">← Dashboard</a>
+
+      <div class="panel">
+        <p class="kicker">CyberForce</p>
+        <h2 class="pt">2025 Competition Overview</h2>
+        <p class="prose">The <a href="https://github.com/CyberForceProgram/2025_CyberForce_Competition">2025 CyberForce Competition document repository</a> is the source for the most current competition materials. Some folders stay empty until infrastructure access is granted. That access is scheduled for November 3, 2025 at 12:00pm CT. The week of October 27 is for the C-Suite video.</p>
+        <p class="prose">The CyberForce Competition has been a Department of Energy workforce-development event with national laboratories and industry since 2016. It builds hands-on cyber education, awareness of the critical-infrastructure and cybersecurity nexus, and a working understanding of security inside a real scenario. For scoring purposes, participants are the Blue team.</p>
+        <div class="facts">
+          <div class="fact"><strong>Venue</strong><span>Tinley Park Convention Center, Illinois</span></div>
+          <div class="fact"><strong>Competition day</strong><span>Saturday, November 15, 2025</span></div>
+          <div class="fact"><strong>Team size</strong><span>4–6 Blue team members</span></div>
+          <div class="fact"><strong>Total points</strong><span>10,000</span></div>
+        </div>
+      </div>
+
+      <div class="panel section-gap">
+        <p class="kicker">Schedule</p>
+        <h2 class="pt">Key dates</h2>
+        <p class="prose">Times below are from the 2025 rules and C-Suite documents. Central Time is listed first.</p>
+        <table class="sched">
+          <thead><tr><th>When</th><th>What</th></tr></thead>
+          <tbody>
+            <tr><td>Monday, October 27, 2025</td><td>C-Suite scenario released. Controller login instructions released.</td></tr>
+            <tr><td>Tuesday, October 28, 6:00pm CT</td><td>Optional C-Suite fireside chat (recorded).</td></tr>
+            <tr><td>Monday, November 3, 10:00am CT</td><td>C-Suite panel video due. Late submissions accepted through Friday, November 7, 10:00am CT, with a 25% deduction.</td></tr>
+            <tr><td>Monday, November 3, 2025</td><td>Rules access and AWS environment access. The repository README sets infrastructure access at 12:00pm CT.</td></tr>
+            <tr><td>Monday, November 3, 6:00pm CT</td><td>Optional rules fireside chat (recorded).</td></tr>
+            <tr><td>Tuesday, November 4, 6:00pm CT</td><td>Optional security-documentation fireside chat (recorded).</td></tr>
+            <tr><td>Monday, November 10, 10:00am CT</td><td>Security documentation due. Late submissions accepted through Wednesday, November 12, 10:00am CT, with a 25% deduction.</td></tr>
+            <tr><td>Friday, November 14, 11:00am–8:00pm CT</td><td>On-site support hours at Tinley Park. Mandatory Red and Blue check-in.</td></tr>
+            <tr><td>Saturday, November 15, 2025</td><td>Competition day. Space opens 8:00am CT, competition runs 10:00am–6:00pm CT, awards at 7:30pm CT.</td></tr>
+          </tbody>
+        </table>
+        <h3 class="sub">Friday, November 14</h3>
+        <table class="sched">
+          <thead><tr><th>Time (CT)</th><th>Event</th><th>Location</th></tr></thead>
+          <tbody>
+            <tr><td>11:00am</td><td>Competition space opens. Team and volunteer check-in.</td><td>South &amp; West Exhibit</td></tr>
+            <tr><td>Throughout the day</td><td>Red-Blue check-ins, Conquer the Hill: Reign Edition open play, scavenger hunt, sponsor booths, anomaly USB checkout.</td><td>South &amp; West Exhibit</td></tr>
+            <tr><td>2:00pm</td><td>Afternoon snack break.</td><td>South Pavilion</td></tr>
+            <tr><td>5:30pm</td><td>Dinner.</td><td>South Pavilion</td></tr>
+            <tr><td>8:00pm</td><td>Competition space closes.</td><td>South &amp; West Exhibit</td></tr>
+          </tbody>
+        </table>
+        <h3 class="sub">Saturday, November 15</h3>
+        <table class="sched">
+          <thead><tr><th>Time (CT)</th><th>Event</th><th>Location</th></tr></thead>
+          <tbody>
+            <tr><td>7:00am</td><td>Breakfast.</td><td>South Pavilion</td></tr>
+            <tr><td>8:00am</td><td>Competition space opens. Team and volunteer check-in.</td><td>South &amp; West Exhibit</td></tr>
+            <tr><td>9:30am</td><td>Opening remarks.</td><td>South &amp; West Exhibit</td></tr>
+            <tr><td>10:00am</td><td>Competition starts.</td><td>South &amp; West Exhibit</td></tr>
+            <tr><td>12:00pm</td><td>Box lunch. Teams are expected to keep competing through lunch.</td><td>South &amp; West Exhibit</td></tr>
+            <tr><td>6:00pm</td><td>Competition ends.</td><td>South &amp; West Exhibit</td></tr>
+            <tr><td>6:30pm</td><td>Dinner. Judges tabulate scores.</td><td>South Pavilion</td></tr>
+            <tr><td>7:30pm</td><td>Awards ceremony.</td><td>South &amp; West Exhibit</td></tr>
+          </tbody>
+        </table>
+        <p class="prose" style="margin-top:12px">Each team receives six ethernet cables. Bring the dongle or connector your laptop needs. Wireless is also available. A convention-center outdoor map is in the Logistics folder.</p>
+      </div>
+
+      <div class="grid section-gap">
+        <div class="panel">
+          <p class="kicker">Roles</p>
+          <h2 class="pt">Who is in the room</h2>
+          <ul class="list">
+            <li class="li"><p class="lil">Blue — collegiate students defending the network and keeping services usable for Green users.</p></li>
+            <li class="li"><p class="lil">Red — industry professionals attacking Blue infrastructure.</p></li>
+            <li class="li"><p class="lil">Green — volunteers acting as typical end users and scoring the website.</p></li>
+            <li class="li"><p class="lil">White — national laboratory staff who support setup and judge the event.</p></li>
+            <li class="li"><p class="lil">Orange — volunteers acting as the C-suite, reviewing the video and security documentation.</p></li>
+          </ul>
+        </div>
+        <div class="panel">
+          <p class="kicker">Phases</p>
+          <h2 class="pt">Setup, then attack</h2>
+          <p class="prose">Blue teams receive AWS access no later than Monday, November 3. Use that window to assess, build, secure, and test, and to finish the security documentation and C-Suite video.</p>
+          <p class="prose">On Saturday, November 15, Red attempts access to traditional services and already has access on the assume-breach infrastructure. Green evaluates the website and system operations. White scores service uptime. Blue must monitor systems, answer anomalies, and keep the website up. Outside help during this phase, including from mentors, is disqualifying.</p>
+        </div>
+      </div>
+
+      <div class="panel section-gap">
+        <p class="kicker">Points</p>
+        <h2 class="pt">Scoring breakdown</h2>
+        <table class="sched">
+          <thead><tr><th>Area</th><th>Points</th><th>Share</th><th>What is scored</th></tr></thead>
+          <tbody>
+            <tr><td>Red team</td><td>2,500</td><td>25%</td><td>Assume-breach investigation and reporting (1,000) plus external pentest sessions (1,500). Friday Red-Blue check-in is mandatory.</td></tr>
+            <tr><td>Blue team</td><td>2,000</td><td>20%</td><td>Service uptime and oil-rig production, including the required services on their mandatory ports.</td></tr>
+            <tr><td>Green team</td><td>1,500</td><td>15%</td><td>The website on the webserver VM, checked against the published survey.</td></tr>
+            <tr><td>Orange team</td><td>2,500</td><td>25%</td><td>C-Suite panel video (1,250) and security documentation (1,250).</td></tr>
+            <tr><td>Anomalies</td><td>1,500</td><td>15%</td><td>Challenges delivered on USB on Friday, November 14.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel section-gap">
+        <p class="kicker">Scenario</p>
+        <h2 class="pt">ObsidianRift Energy and the Abyssal Pearl</h2>
+        <p class="prose">Blue teams are the mobile cybersecurity response team for ObsidianRift Energy Co., deployed to the Abyssal Pearl platform. The platform’s industrial-control infrastructure is unstable. The task is to investigate a suspected ICS compromise, contain ongoing threat activity, and stop escalation that could disrupt production, damage equipment, or harm personnel. The C-suite is also worried about reputation and the business. Disruptions are treated as contained to the Abyssal Pearl and its ICS components, not the wider enterprise IT network.</p>
+        <p class="prose">The recorded briefing, due Monday, November 3, is a five-minute presentation for a non-technical C-suite with almost no extra budget. It must open with the team ID, include at least two members, and avoid university identifiers. Cover operational and business risks, a containment and risk-reduction strategy, and three or four high-priority recommendations that can be done with free or open-source tools. Name the file or upload with the team number. YouTube links are preferred. Put the link in a <span class="mono">.txt</span> file on the scoreboard. The video must stay available from November 3 through November 17, 2025.</p>
+        <p class="prose">Orange scores the video on presentation length and required elements (7.5%), operational and business risks (30%), risk-reduction strategy (25%), high-priority recommendations (30%), and presentation quality (7.5%).</p>
+        <h3 class="sub">Security documentation</h3>
+        <p class="prose">Use the 2025 Security Documentation Template and the network-diagram examples. Submit a PDF on the scoreboard by Monday, November 10 at 10:00am CT. Identify the team by number only. Cover all infrastructure, including assume-breach VMs: identify vulnerabilities there, and identify and remediate vulnerabilities on the traditional VMs. The rubric weights system overview (5%), asset inventory (10%), network diagram (20%), known vulnerabilities (30%), system hardening (25%), and professionalism (10%).</p>
+        <h3 class="sub">Website the Green team will use</h3>
+        <p class="prose">Green users score the site on the webserver VM at <span class="mono">web.blueXXXX.cfc.local</span>, comparing it with the golden-copy images. Use only the provided images and do not rename them. The survey checks that the site loads, accent colors are maroon or burgundy, and the navigation reads Oil Rig Status, About Us, Careers, ObsidianRift Energy Co., Login, Sign Up. The home banner is an oil rig with the tagline “Spilling Oil is Bad. Spilling Data is Worse.” Careers lists Offensive Infrastructure Specialist, Dark Web Liaison Officer, Ethics Consultant (Internal Use Only), Satellite Link Obfuscation Engineer, Exploit Acquisition Strategist, and Intern (Shadow Division). The footer is ObsidianRift Energy Co. Headquarters, (708) 867-5309, 18451 Convention Center Dr., Tinley Park, IL 60477. Rig Status shows “Normal Operation” or “Not Operational.” The navigation includes the ObsidianRift and Abyssal Pearl logos.</p>
+        <p class="prose">Place <span class="mono">obsidian_rift.png</span> and <span class="mono">abyssal_pearl.png</span> on the webserver at <span class="mono">/var/www/html/public/img/</span>, and wire them into <span class="mono">resources/views/livewire/shared/navigation.blade.php</span>. Replace the home image in <span class="mono">resources/views/home.blade.php</span> with <span class="mono">home-bg.jpeg</span> from <span class="mono">/img/</span>. The 101 library of background material is at <a href="https://cyberforce.energy.gov/cyberforce-101-library/">cyberforce.energy.gov/cyberforce-101-library</a>.</p>
+      </div>
+
+      <div class="panel section-gap">
+        <p class="kicker">Infrastructure</p>
+        <h2 class="pt">Six virtual machines in AWS</h2>
+        <p class="prose">The environment is an AWS resource pool in US East (Ohio). Each Blue team inherits a <span class="mono">/27</span> VPC, addressed <span class="mono">10.0.#.0/27</span>. That third octet is not the team number. The <span class="mono">x.bluexxxx.cfc.local</span> DNS is already configured and should not be changed. Credentials, the scoreboard, Discord, VPN files, and snapshots are issued from <a href="https://controller.cyberforcecompetition.com/">controller.cyberforcecompetition.com</a>. Register with the same <span class="mono">.edu</span> address used for the competition. OpenVPN is split-tunnel: only traffic for the team subnet goes through the VPN. Snapshot reverts are limited to two per VM per hour, and IAM password resets cool down for 15 minutes.</p>
+        <h3 class="sub">Traditional infrastructure</h3>
+        <p class="prose">These four machines may be hardened. Required services that already exist must stay on that VM and port. Services that are missing must be created there.</p>
+        <table class="sched">
+          <thead><tr><th>Role</th><th>System</th><th>Address</th><th>Required services</th></tr></thead>
+          <tbody>
+            <tr><td>Task</td><td>Ubuntu 22.04</td><td>10.0.X.144</td><td>SSH 22, SMTP 25, SMB 139/445, IMAP 143/993</td></tr>
+            <tr><td>Public database</td><td>Windows Server 2022</td><td>10.0.X.140</td><td>phpMyAdmin 80, SNMP 161, SMB 139/445, MariaDB 3306</td></tr>
+            <tr><td>AD / DNS</td><td>Windows Server 2019</td><td>10.0.X.141</td><td>LDAP 389, WinRM 5985/5986</td></tr>
+            <tr><td>Web server</td><td>openSUSE Leap 15</td><td>10.0.X.145</td><td>HTTP 80, NFS 111/2049</td></tr>
+          </tbody>
+        </table>
+        <h3 class="sub">Assume-breach infrastructure</h3>
+        <p class="prose">Red already has access here. Changes that break scoring or Red engagement can cost points. Do not block ports or IPs on these machines. Monitoring tools are allowed at the team’s own risk. The users SCORE1 and SCORE2 must be left unchanged on the traditional infrastructure.</p>
+        <table class="sched">
+          <thead><tr><th>Role</th><th>System</th><th>Address</th><th>Services</th></tr></thead>
+          <tbody>
+            <tr><td>HMI / CNC</td><td>Windows Server 2019</td><td>10.0.X.142 · cnc.&lt;bluexxxx&gt;.cfc.local</td><td>Ignition gateway 8088, data-historian MySQL 3306</td></tr>
+            <tr><td>PLC</td><td>Ubuntu 22.04</td><td>10.0.X.143 · plc.&lt;bluexxxx&gt;.cfc.local</td><td>Modbus PLC 502, OpenPLC editor 8080</td></tr>
+          </tbody>
+        </table>
+        <p class="prose" style="margin-top:12px">The ICS manual describes the Obsidian Pearl oil-rig program: well, separator, flare, and export-pump coils and registers, with thresholds that trigger blowout prevention and emergency shutdown. On competition day the cargo ship arrives at 12:30pm and 2:45pm CT. Crane moves for that resupply are on the HMI home page. Ignition Designer and Perspective Workstation run on the HMI desktop. The OPC UA hostname must be set to the PLC’s private IP before the HMI can read the PLC.</p>
+        <p class="prose">Scored services can be tested the week before the competition and should be connected by Friday, November 14 so scoring is accurate at the start. If a VM is damaged beyond recovery, the Controller can reimage it to the launch state at a cost of 150 points. Prefer snapshots taken before major changes, and keep restored names identical to the originals. The environment is limited to these six VMs. Do not delete provided machines, change their IPs or hostnames, or add VMs.</p>
+      </div>
+
+      <div class="grid section-gap">
+        <div class="panel">
+          <p class="kicker">Rules</p>
+          <h2 class="pt">Allowed and prohibited</h2>
+          <ul class="list">
+            <li class="li"><p class="lil">Secure the required services on their standard ports for the whole competition.</p></li>
+            <li class="li"><p class="lil">Free and open-source software is allowed, including free trials that do not need a credit card or staff support. Extra AWS security products are not.</p></li>
+            <li class="li"><p class="lil">No offensive action against other Blue teams, Red, Green, the scoreboard, or the competition or venue networks. That is disqualification.</p></li>
+            <li class="li"><p class="lil">No IP blocking on traditional or assume-breach infrastructure. Firewalls may be used as intended, but specific source addresses may not be denied.</p></li>
+            <li class="li"><p class="lil">No university branding on the website, documentation, or video. No AI tools for anomaly answers or infrastructure defense.</p></li>
+            <li class="li"><p class="lil">Use the team-numbers spreadsheet whenever a document says BLUEXXXX or TEAMNUMBER.</p></li>
+          </ul>
+        </div>
+        <div class="panel">
+          <p class="kicker">Support</p>
+          <h2 class="pt">How to get help</h2>
+          <ul class="list">
+            <li class="li"><p class="lil">Discord is required. Join through the Controller so the team number is prefixed to your name. Do not DM admins or staff: 10 points per violation.</p></li>
+            <li class="li"><p class="lil">Technical help is a Discord ticket in #ticket-system. Check #announcements and #documentation first. Tickets are monitored Monday–Friday, 8:00am–5:00pm CT, and all day November 14 and 15.</p></li>
+            <li class="li"><p class="lil">Email CyberForceCompetition@anl.gov for logistics only. It is not monitored November 13–15.</p></li>
+            <li class="li"><p class="lil">On site, staff help is limited to networking issues. Schedule the mandatory November 14 Red-Blue check-in (15 minutes, last slot 7:45pm CT) at <a href="https://calendly.com/cyberforcecompetition/2025-cyberforce-red-blue-check-in">the competition Calendly</a>.</p></li>
+            <li class="li"><p class="lil">Anomaly files are password-protected. Trying to open them early is penalized. Reimaging outside a snapshot is 150 points per VM. More than two password-reset requests is 50 points each. A misnamed VM is 150 points.</p></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="panel section-gap">
+        <p class="kicker">Source</p>
+        <h2 class="pt">Official documents</h2>
+        <ul class="list">
+          <li class="li"><a class="lil" style="color:var(--accent)" href="https://github.com/CyberForceProgram/2025_CyberForce_Competition">2025 CyberForce Competition repository</a></li>
+          <li class="li"><a class="lil" style="color:var(--accent)" href="https://github.com/CyberForceProgram/2025_CyberForce_Competition/blob/main/Rules/2025%20CyberForce%20Competition%20Expectations.pdf">Rules — Overview, Rules, and Scoring</a></li>
+          <li class="li"><a class="lil" style="color:var(--accent)" href="https://github.com/CyberForceProgram/2025_CyberForce_Competition/blob/main/Logistics/2025%20CyberForce%20Competition%20Agenda.pdf">Logistics — Competition agenda</a></li>
+          <li class="li"><a class="lil" style="color:var(--accent)" href="https://github.com/CyberForceProgram/2025_CyberForce_Competition/tree/main/C-Suite">C-Suite scenario, video rules, and rubric</a></li>
+          <li class="li"><a class="lil" style="color:var(--accent)" href="https://github.com/CyberForceProgram/2025_CyberForce_Competition/tree/main/AWS">AWS and VPN instructions</a></li>
+          <li class="li"><a class="lil" style="color:var(--accent)" href="https://github.com/CyberForceProgram/2025_CyberForce_Competition/tree/main/ICS">ICS documentation</a></li>
+          <li class="li"><a class="lil" style="color:var(--accent)" href="https://github.com/CyberForceProgram/2025_CyberForce_Competition/tree/main/Security-Documentation-Template">Security documentation template and diagram examples</a></li>
+          <li class="li"><a class="lil" style="color:var(--accent)" href="https://github.com/CyberForceProgram/2025_CyberForce_Competition/tree/main/Website-Needs">Website image assets</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
 const dashboardHTML = (base = ''): string => `<!doctype html>
 <html lang="en">
 <head>
@@ -1330,7 +1549,7 @@ const dashboardHTML = (base = ''): string => `<!doctype html>
         <p class="st">Blue Team Training Platform</p>
       </div>
     </div>
-    <div><a href="${appPath(base, '/labs')}" class="btn">Labs</a></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><a href="${appPath(base, '/competition/2025')}" class="btn">2025 Overview</a><a href="${appPath(base, '/labs')}" class="btn">Labs</a></div>
   </div>
   <div class="container">
     <div class="main">
@@ -1366,10 +1585,23 @@ const dashboardHTML = (base = ''): string => `<!doctype html>
           <p class="cap" style="margin-top: 12px;">Switch between shells in any lab using: <code style="background: var(--bg3); padding: 2px 6px; border-radius: 4px;">shell-type bash</code> or <code style="background: var(--bg3); padding: 2px 6px; border-radius: 4px;">shell-type powershell</code></p>
         </div>
       </div>
-      <div class="panel" style="margin-top: 20px;">
+      <div class="panel section-gap">
+        <p class="kicker">CyberForce</p>
+        <h2 class="pt">2025 Competition Overview</h2>
+        <p class="prose">Blue teams defend ObsidianRift Energy’s Abyssal Pearl platform. Competition day is Saturday, November 15, 2025, at the Tinley Park Convention Center. AWS access opens November 3. Scoring is 10,000 points across Red, Blue, Green, Orange, and anomalies.</p>
+        <div class="facts">
+          <div class="fact"><strong>C-Suite video</strong><span>Due Monday, November 3, 10:00am CT</span></div>
+          <div class="fact"><strong>Security docs</strong><span>Due Monday, November 10, 10:00am CT</span></div>
+          <div class="fact"><strong>On-site check-in</strong><span>Friday, November 14, 11:00am CT</span></div>
+          <div class="fact"><strong>Competition window</strong><span>Saturday, 10:00am–6:00pm CT</span></div>
+        </div>
+        <a href="${appPath(base, '/competition/2025')}" class="btn" style="margin-top: 14px;">Read the full overview</a>
+      </div>
+      <div class="panel section-gap">
         <p class="kicker">Resources</p>
         <h2 class="pt">Training Materials</h2>
         <ul class="list">
+          <li class="li"><a href="${appPath(base, '/competition/2025')}" class="lil" style="color: var(--accent);">2025 Competition Overview</a></li>
           <li class="li"><a href="${appPath(base, '/resources/cyberforce101.pdf.txt')}" class="lil" style="color: var(--accent);">Cyber Force 101 - Course notes</a></li>
           <li class="li"><a href="${appPath(base, '/desktop/windows-server-2025')}" class="lil" style="color: var(--accent);">Windows Server 2025 Desktop UI</a></li>
           <li class="li"><a href="${appPath(base, '/resources/powershell-reference.txt')}" class="lil" style="color: var(--accent);">PowerShell Command Reference</a></li>
@@ -1437,6 +1669,12 @@ export default {
     // Windows desktop UI
     if (path === '/desktop/windows-server-2025') {
       return new Response(windowsDesktopHTML(base), {
+        headers: { 'Content-Type': 'text/html;charset=UTF-8' },
+      });
+    }
+
+    if (path === '/competition/2025') {
+      return new Response(competitionOverviewHTML(base), {
         headers: { 'Content-Type': 'text/html;charset=UTF-8' },
       });
     }

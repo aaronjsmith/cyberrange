@@ -33,6 +33,27 @@ describe('Cyberrange Worker', () => {
       const html = await response.text();
       expect(html).toContain('Cyberrange Dashboard');
       expect(html).toContain('Blue Team Training Platform');
+      expect(html).toContain('2025 Competition Overview');
+      expect(html).toContain('/competition/2025');
+    });
+  });
+
+  describe('2025 Competition Overview', () => {
+    it('should return the competition overview page', async () => {
+      const request = new Request('http://localhost:8787/competition/2025', {
+        method: 'GET',
+      });
+
+      const response = await mockFetch(request, {});
+      const html = await response.text();
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Content-Type')).toContain('text/html');
+      expect(html).toContain('2025 Competition Overview');
+      expect(html).toContain('ObsidianRift Energy');
+      expect(html).toContain('November 15, 2025');
+      expect(html).toContain('Tinley Park Convention Center');
+      expect(html).toContain('10,000');
     });
   });
 
