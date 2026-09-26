@@ -71,113 +71,181 @@ function levelIcon(level: string): string {
   return 'ℹ';
 }
 
-function renderEventViewerMmc(attackActive: boolean): string {
-  const rows = attackActive ? SECURITY_EVENTS_ATTACK : SECURITY_EVENTS_QUIET;
-  const first = rows[0];
+function mmcShell(opts: {
+  consolePath: string;
+  treeHtml: string;
+  centerHtml: string;
+  actionTitle: string;
+  actionButtons: string[];
+  status?: string;
+}): string {
+  const actions = opts.actionButtons
+    .map((label) => `<button type="button" class="mmc-action">${label}</button>`)
+    .join('');
   return `
     <div class="mmc">
       <div class="mmc-menubar">
-        <span>File</span><span>Action</span><span>View</span><span>Help</span>
+        <span>File</span><span>Action</span><span>View</span><span>Favorites</span><span>Window</span><span>Help</span>
       </div>
       <div class="mmc-toolbar">
-        <button type="button" disabled>Back</button>
-        <button type="button" disabled>Forward</button>
+        <button type="button" class="mmc-tool" disabled title="Back">◀</button>
+        <button type="button" class="mmc-tool" disabled title="Forward">▶</button>
         <span class="mmc-sep"></span>
-        <button type="button">Refresh</button>
-        <button type="button">Properties</button>
-        <button type="button">Help</button>
+        <button type="button" class="mmc-tool" title="Up">▲</button>
+        <button type="button" class="mmc-tool" title="Show/Hide Console Tree">▤</button>
+        <span class="mmc-sep"></span>
+        <button type="button" class="mmc-tool" title="Help">?</button>
       </div>
-      <div class="mmc-path">Event Viewer (Local) \\ Windows Logs \\ Security</div>
+      <div class="mmc-path">${opts.consolePath}</div>
       <div class="mmc-body">
-        <aside class="mmc-tree">
-          <div class="mmc-tree-root open">Event Viewer (Local)</div>
-          <div class="mmc-tree-group open">
-            <div class="mmc-tree-label">Custom Views</div>
-            <div class="mmc-tree-item">Administrative Events</div>
-          </div>
-          <div class="mmc-tree-group open">
-            <div class="mmc-tree-label">Windows Logs</div>
-            <div class="mmc-tree-item">Application</div>
-            <div class="mmc-tree-item active" data-log="Security">Security</div>
-            <div class="mmc-tree-item">Setup</div>
-            <div class="mmc-tree-item">System</div>
-            <div class="mmc-tree-item">Forwarded Events</div>
-          </div>
-          <div class="mmc-tree-group">
-            <div class="mmc-tree-label">Applications and Services Logs</div>
-          </div>
-          <div class="mmc-tree-item">Subscriptions</div>
-        </aside>
-        <section class="mmc-main">
-          <div class="mmc-list-pane">
-            <div class="mmc-list-title">Security</div>
-            <table class="mmc-table">
-              <thead>
-                <tr>
-                  <th>Level</th>
-                  <th>Date and Time</th>
-                  <th>Source</th>
-                  <th>Event ID</th>
-                  <th>Task Category</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rows
-                  .map(
-                    (r, i) => `
-                  <tr class="mmc-row ${r.level === 'Failure' ? 'fail' : ''} ${i === 0 ? 'selected' : ''}"
-                      data-idx="${i}"
-                      data-level="${r.level}"
-                      data-time="${r.time}"
-                      data-id="${r.id}"
-                      data-source="${r.source}"
-                      data-task="${r.task}"
-                      data-message="${r.message.replace(/"/g, '&quot;')}">
-                    <td><span class="lvl">${levelIcon(r.level)}</span> ${r.level === 'Failure' ? 'Audit Failure' : 'Audit Success'}</td>
-                    <td>${r.time}</td>
-                    <td>${r.source}</td>
-                    <td>${r.id}</td>
-                    <td>${r.task}</td>
-                  </tr>`,
-                  )
-                  .join('')}
-              </tbody>
-            </table>
-          </div>
-          <div class="mmc-preview" id="mmc-preview">
-            <div class="mmc-preview-title">General</div>
-            <div class="mmc-preview-meta">
-              <div><span>Log Name:</span> Security</div>
-              <div><span>Source:</span> <em data-f="source">${first?.source || ''}</em></div>
-              <div><span>Event ID:</span> <em data-f="id">${first?.id || ''}</em></div>
-              <div><span>Level:</span> <em data-f="level">${first?.level === 'Failure' ? 'Audit Failure' : 'Audit Success'}</em></div>
-              <div><span>User:</span> N/A</div>
-              <div><span>OpCode:</span> Info</div>
-              <div><span>Logged:</span> <em data-f="time">${first?.time || ''}</em></div>
-              <div><span>Task Category:</span> <em data-f="task">${first?.task || ''}</em></div>
-              <div><span>Keywords:</span> Audit Success, Audit Failure</div>
-              <div><span>Computer:</span> WIN-SRV-2025-01.CYBERRANGE.local</div>
-            </div>
-            <pre class="mmc-preview-msg" data-f="message">${first?.message || ''}</pre>
-          </div>
-        </section>
+        <aside class="mmc-tree">${opts.treeHtml}</aside>
+        <section class="mmc-main">${opts.centerHtml}</section>
         <aside class="mmc-actions">
           <div class="mmc-actions-title">Actions</div>
-          <div class="mmc-actions-group">Security</div>
-          <button type="button">Open Saved Log...</button>
-          <button type="button">Create Custom View...</button>
-          <button type="button">Import Custom View...</button>
-          <button type="button">Filter Current Log...</button>
-          <button type="button">Find...</button>
-          <button type="button">Clear Log...</button>
-          <button type="button">Properties</button>
+          <div class="mmc-actions-group">
+            <span>${opts.actionTitle}</span>
+            <button type="button" class="mmc-collapse" aria-label="Collapse">▲</button>
+          </div>
+          ${actions}
+          <button type="button" class="mmc-action more">More Actions ▸</button>
         </aside>
       </div>
-      <div class="mmc-status">${rows.length} event(s) · WIN-SRV-2025-01</div>
+      <div class="mmc-status">
+        <span>${opts.status || ''}</span>
+        <span></span>
+        <span></span>
+      </div>
     </div>`;
 }
 
+function mmcTreeNode(opts: {
+  label: string;
+  depth?: number;
+  open?: boolean;
+  active?: boolean;
+  leaf?: boolean;
+  icon?: string;
+}): string {
+  const depth = opts.depth ?? 0;
+  const twist = opts.leaf ? '<span class="twist empty"></span>' : `<span class="twist">${opts.open ? '▼' : '▶'}</span>`;
+  const cls = [
+    'mmc-node',
+    opts.active ? 'active' : '',
+    opts.open ? 'open' : '',
+    opts.leaf ? 'leaf' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return `<div class="${cls}" style="--d:${depth}" data-label="${opts.label}">${twist}<span class="ico ${opts.icon || 'folder'}"></span><span class="lbl">${opts.label}</span></div>`;
+}
+
+function renderEventViewerMmc(attackActive: boolean): string {
+  const rows = attackActive ? SECURITY_EVENTS_ATTACK : SECURITY_EVENTS_QUIET;
+  const first = rows[0];
+  const tree = [
+    mmcTreeNode({ label: 'Event Viewer (Local)', depth: 0, open: true, icon: 'console' }),
+    mmcTreeNode({ label: 'Custom Views', depth: 1, open: false, icon: 'folder' }),
+    mmcTreeNode({ label: 'Windows Logs', depth: 1, open: true, icon: 'folder' }),
+    mmcTreeNode({ label: 'Application', depth: 2, leaf: true, icon: 'log' }),
+    mmcTreeNode({ label: 'Security', depth: 2, leaf: true, active: true, icon: 'log' }),
+    mmcTreeNode({ label: 'Setup', depth: 2, leaf: true, icon: 'log' }),
+    mmcTreeNode({ label: 'System', depth: 2, leaf: true, icon: 'log' }),
+    mmcTreeNode({ label: 'Forwarded Events', depth: 2, leaf: true, icon: 'log' }),
+    mmcTreeNode({ label: 'Applications and Services Logs', depth: 1, open: false, icon: 'folder' }),
+    mmcTreeNode({ label: 'Subscriptions', depth: 1, leaf: true, icon: 'doc' }),
+  ].join('');
+
+  const center = `
+    <div class="mmc-list-pane">
+      <table class="mmc-table">
+        <thead>
+          <tr>
+            <th>Level</th>
+            <th>Date and Time</th>
+            <th>Source</th>
+            <th>Event ID</th>
+            <th>Task Category</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows
+            .map(
+              (r, i) => `
+            <tr class="mmc-row ${r.level === 'Failure' ? 'fail' : ''} ${i === 0 ? 'selected' : ''}"
+                data-level="${r.level}"
+                data-time="${r.time}"
+                data-id="${r.id}"
+                data-source="${r.source}"
+                data-task="${r.task}"
+                data-message="${r.message.replace(/"/g, '&quot;')}">
+              <td><span class="lvl">${levelIcon(r.level)}</span> ${r.level === 'Failure' ? 'Audit Failure' : 'Audit Success'}</td>
+              <td>${r.time}</td>
+              <td>${r.source}</td>
+              <td>${r.id}</td>
+              <td>${r.task}</td>
+            </tr>`,
+            )
+            .join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="mmc-preview" id="mmc-preview">
+      <div class="mmc-preview-title">General</div>
+      <div class="mmc-preview-meta">
+        <div><span>Log Name:</span> Security</div>
+        <div><span>Source:</span> <em data-f="source">${first?.source || ''}</em></div>
+        <div><span>Event ID:</span> <em data-f="id">${first?.id || ''}</em></div>
+        <div><span>Level:</span> <em data-f="level">${first?.level === 'Failure' ? 'Audit Failure' : 'Audit Success'}</em></div>
+        <div><span>User:</span> N/A</div>
+        <div><span>OpCode:</span> Info</div>
+        <div><span>Logged:</span> <em data-f="time">${first?.time || ''}</em></div>
+        <div><span>Task Category:</span> <em data-f="task">${first?.task || ''}</em></div>
+        <div><span>Keywords:</span> Audit Success, Audit Failure</div>
+        <div><span>Computer:</span> WIN-SRV-2025-01.CYBERRANGE.local</div>
+      </div>
+      <pre class="mmc-preview-msg" data-f="message">${first?.message || ''}</pre>
+    </div>`;
+
+  return mmcShell({
+    consolePath: 'Event Viewer (Local)\\Windows Logs\\Security',
+    treeHtml: tree,
+    centerHtml: center,
+    actionTitle: 'Security',
+    actionButtons: [
+      'Open Saved Log...',
+      'Create Custom View...',
+      'Filter Current Log...',
+      'Find...',
+      'Clear Log...',
+      'Properties',
+      'Help',
+      'Refresh',
+    ],
+    status: `${rows.length} event(s)`,
+  });
+}
+
+function wireMmcChrome(root: HTMLElement): void {
+  root.querySelectorAll('.mmc-node:not(.leaf)').forEach((node) => {
+    node.addEventListener('click', (e) => {
+      e.stopPropagation();
+      node.classList.toggle('open');
+      const twist = node.querySelector('.twist');
+      if (twist && !twist.classList.contains('empty')) {
+        twist.textContent = node.classList.contains('open') ? '▼' : '▶';
+      }
+    });
+  });
+  root.querySelectorAll('.mmc-node').forEach((node) => {
+    node.addEventListener('click', () => {
+      root.querySelectorAll('.mmc-node').forEach((n) => n.classList.remove('active'));
+      node.classList.add('active');
+    });
+  });
+}
+
 function wireEventViewer(root: HTMLElement): void {
+  wireMmcChrome(root);
   const preview = root.querySelector('#mmc-preview');
   if (!preview) return;
   root.querySelectorAll('.mmc-row').forEach((row) => {
@@ -198,120 +266,118 @@ function wireEventViewer(root: HTMLElement): void {
       set('message', el.dataset.message || '');
     });
   });
+}
 
-  root.querySelectorAll('.mmc-tree-item').forEach((item) => {
-    item.addEventListener('click', () => {
-      root.querySelectorAll('.mmc-tree-item').forEach((n) => n.classList.remove('active'));
-      item.classList.add('active');
-    });
-  });
+function smTile(opts: {
+  title: string;
+  count: number;
+  critical?: boolean;
+  manageIssues?: number;
+  stamp?: string;
+}): string {
+  const critical = Boolean(opts.critical);
+  const issues = opts.manageIssues ?? 0;
+  return `
+    <article class="sm-tile ${critical ? 'critical' : 'healthy'}">
+      <header class="sm-tile-head">
+        <span class="sm-tile-ico" aria-hidden="true"></span>
+        <span class="sm-tile-title">${opts.title}</span>
+        <span class="sm-tile-count">${opts.count}</span>
+      </header>
+      <div class="sm-tile-status">
+        ${
+          critical
+            ? `<span class="sm-badge err">${issues || opts.count}</span>`
+            : `<span class="sm-badge ok" aria-hidden="true">↑</span>`
+        }
+        <span>Manageability</span>
+      </div>
+      <ul class="sm-tile-links">
+        <li>Events</li>
+        <li>Services</li>
+        <li>Best Practices Analyzer</li>
+        <li>Performance</li>
+        <li>Roles and Features</li>
+      </ul>
+      ${opts.stamp ? `<footer class="sm-tile-stamp">${opts.stamp}</footer>` : ''}
+    </article>`;
 }
 
 function serverManagerHtml(): string {
+  const stamp = '9/23/2026 7:40 AM';
   return `
     <div class="sm">
       <header class="sm-top">
-        <div class="sm-brand">
-          <span class="sm-brand-mark" aria-hidden="true"></span>
-          <div>
-            <div class="sm-brand-title">Server Manager</div>
-            <div class="sm-brand-sub">WIN-SRV-2025-01</div>
-          </div>
+        <div class="sm-top-left">
+          <button type="button" class="sm-navbtn" title="Back" disabled>◀</button>
+          <button type="button" class="sm-navbtn" title="Forward" disabled>▶</button>
+          <div class="sm-crumb" id="sm-crumb"><span>Server Manager</span><span class="sep">›</span><span>Dashboard</span></div>
         </div>
         <div class="sm-top-actions">
-          <button type="button" class="sm-link">Manage ▾</button>
-          <button type="button" class="sm-link">Tools ▾</button>
-          <button type="button" class="sm-link">View ▾</button>
-          <button type="button" class="sm-link">Help ▾</button>
-          <button type="button" class="sm-flag" title="Notifications">⚑ 1</button>
+          <button type="button" class="sm-iconbtn" title="Refresh">↻</button>
+          <button type="button" class="sm-flag" title="Notifications"><span class="flag">⚑</span><span class="warn">⚠</span></button>
+          <button type="button" class="sm-link">Manage</button>
+          <button type="button" class="sm-link">Tools</button>
+          <button type="button" class="sm-link">View</button>
+          <button type="button" class="sm-link">Help</button>
         </div>
       </header>
       <div class="sm-shell">
         <nav class="sm-nav">
-          <button type="button" class="sm-nav-item" data-sm-view="dashboard">Dashboard</button>
-          <button type="button" class="sm-nav-item active" data-sm-view="local">Local Server</button>
-          <button type="button" class="sm-nav-item" data-sm-view="all">All Servers</button>
-          <div class="sm-nav-section">Roles and Server Groups</div>
-          <button type="button" class="sm-nav-item" data-sm-view="file">File and Storage Services</button>
-          <button type="button" class="sm-nav-item" data-sm-view="rds">Remote Desktop Services</button>
+          <button type="button" class="sm-nav-item active" data-sm-view="dashboard" data-sm-label="Dashboard">
+            <span class="sm-nav-ico dash"></span>Dashboard
+          </button>
+          <button type="button" class="sm-nav-item" data-sm-view="local" data-sm-label="Local Server">
+            <span class="sm-nav-ico server"></span>Local Server
+          </button>
+          <button type="button" class="sm-nav-item" data-sm-view="all" data-sm-label="All Servers">
+            <span class="sm-nav-ico list"></span>All Servers
+          </button>
+          <button type="button" class="sm-nav-item" data-sm-view="file" data-sm-label="File and Storage Services">
+            <span class="sm-nav-ico folder"></span>File and Storage Services
+          </button>
+          <button type="button" class="sm-nav-item" data-sm-view="rds" data-sm-label="Remote Desktop Services">
+            <span class="sm-nav-ico rds"></span>Remote Desktop Services
+          </button>
         </nav>
         <main class="sm-content">
-          <section class="sm-view" data-sm-panel="dashboard" hidden>
-            <h2 class="sm-h">Welcome to Server Manager</h2>
-            <p class="sm-lead">Configure local and remote servers from this console. Roles below report green when healthy.</p>
-            <div class="sm-tiles">
-              <article class="sm-tile ok">
-                <h3>Local Server</h3>
-                <p>1 server · Online</p>
-                <ul><li>No alerts</li><li>Roles installed: 2</li></ul>
-              </article>
-              <article class="sm-tile ok">
-                <h3>File and Storage Services</h3>
-                <p>1 server · Healthy</p>
-                <ul><li>Volumes: OK</li><li>Shares: 3</li></ul>
-              </article>
-              <article class="sm-tile warn">
-                <h3>Remote Desktop Services</h3>
-                <p>1 server · Attention</p>
-                <ul><li>RDP enabled on 3389</li><li>Review hardening baseline</li></ul>
-              </article>
-              <article class="sm-tile muted">
-                <h3>All Servers</h3>
-                <p>1 managed server</p>
-                <ul><li>CYBERRANGE.local</li></ul>
-              </article>
+          <section class="sm-view" data-sm-panel="dashboard">
+            <div class="sm-section-head">
+              <h2>ROLES AND SERVER GROUPS</h2>
+              <p>Roles: 4 | Server groups: 1 | Servers total: 1</p>
+            </div>
+            <div class="sm-tile-grid">
+              ${smTile({ title: 'File and Storage Services', count: 1, critical: true, manageIssues: 2, stamp })}
+              ${smTile({ title: 'Remote Desktop Services', count: 1, critical: true, manageIssues: 1, stamp })}
+              ${smTile({ title: 'Local Server', count: 1, stamp })}
+              ${smTile({ title: 'All Servers', count: 1, critical: true, manageIssues: 1, stamp })}
+              ${smTile({ title: 'Windows Firewall', count: 1, stamp })}
+              ${smTile({ title: 'Windows Remote Management', count: 1, stamp })}
             </div>
           </section>
-          <section class="sm-view" data-sm-panel="local">
-            <div class="sm-local-head">
-              <h2 class="sm-h">Local Server</h2>
-              <div class="sm-tasks">
-                <button type="button">Refresh</button>
-                <button type="button">Tasks ▾</button>
-              </div>
+          <section class="sm-view" data-sm-panel="local" hidden>
+            <div class="sm-section-head">
+              <h2>LOCAL SERVER</h2>
+              <p>WIN-SRV-2025-01 · CYBERRANGE.local</p>
             </div>
-            <div class="sm-banner">
-              <strong>Properties</strong>
-              <span>Last refreshed just now · Hyper-V not detected</span>
-            </div>
-            <div class="sm-props-grid">
+            <div class="sm-props-grid light">
               <div class="sm-prop"><span>Computer name</span><strong>WIN-SRV-2025-01</strong></div>
               <div class="sm-prop"><span>Domain</span><strong>CYBERRANGE.local</strong></div>
               <div class="sm-prop"><span>Windows Firewall</span><strong class="sm-on">Domain: On</strong></div>
               <div class="sm-prop"><span>Remote management</span><strong class="sm-on">Enabled</strong></div>
               <div class="sm-prop"><span>Remote Desktop</span><strong class="sm-warn">Enabled</strong></div>
-              <div class="sm-prop"><span>NIC Teaming</span><strong>Disabled</strong></div>
-              <div class="sm-prop"><span>Ethernet</span><strong>IPv4 address assigned by DHCP</strong></div>
               <div class="sm-prop"><span>Operating system</span><strong>Windows Server 2025 Datacenter</strong></div>
-              <div class="sm-prop"><span>Hardware</span><strong>Cyberrange Virtual Machine</strong></div>
+              <div class="sm-prop"><span>Ethernet</span><strong>IPv4 address assigned by DHCP</strong></div>
               <div class="sm-prop"><span>Last update installed</span><strong>9/23/2026 6:12 PM</strong></div>
-              <div class="sm-prop"><span>Windows Update</span><strong>Managed by lab policy</strong></div>
-              <div class="sm-prop"><span>Time zone</span><strong>(UTC-06:00) Central Time</strong></div>
-              <div class="sm-prop"><span>Product ID</span><strong>XXXXX-XXXXX-XXXXX-XXXXX-LAB01</strong></div>
               <div class="sm-prop"><span>Processors</span><strong>4 Virtual Processors</strong></div>
               <div class="sm-prop"><span>Installed memory (RAM)</span><strong>16.0 GB</strong></div>
               <div class="sm-prop"><span>Total disk space</span><strong>127 GB</strong></div>
-            </div>
-            <div class="sm-roles">
-              <h3>Roles and Features</h3>
-              <table class="sm-table">
-                <thead><tr><th>Role / Feature</th><th>Type</th><th>Status</th></tr></thead>
-                <tbody>
-                  <tr><td>File and Storage Services</td><td>Role</td><td><span class="pill ok">Installed</span></td></tr>
-                  <tr><td>Remote Desktop Services</td><td>Role</td><td><span class="pill ok">Installed</span></td></tr>
-                  <tr><td>Windows Defender Firewall</td><td>Feature</td><td><span class="pill ok">Installed</span></td></tr>
-                  <tr><td>Windows Remote Management</td><td>Feature</td><td><span class="pill ok">Installed</span></td></tr>
-                </tbody>
-              </table>
-            </div>
-            <div class="sm-events">
-              <h3>Events</h3>
-              <p class="sm-lead">Open <em>Event Viewer</em> on the desktop to inspect Security log entries for failed RDP logons.</p>
+              <div class="sm-prop"><span>Time zone</span><strong>(UTC-06:00) Central Time</strong></div>
             </div>
           </section>
           <section class="sm-view" data-sm-panel="all" hidden>
-            <h2 class="sm-h">All Servers</h2>
-            <table class="sm-table">
+            <div class="sm-section-head"><h2>ALL SERVERS</h2><p>1 managed server</p></div>
+            <table class="sm-table light">
               <thead><tr><th>Server Name</th><th>IPv4 Address</th><th>Manageability</th><th>Status</th></tr></thead>
               <tbody>
                 <tr>
@@ -324,24 +390,17 @@ function serverManagerHtml(): string {
             </table>
           </section>
           <section class="sm-view" data-sm-panel="file" hidden>
-            <h2 class="sm-h">File and Storage Services</h2>
-            <div class="sm-tiles">
-              <article class="sm-tile ok"><h3>Volumes</h3><p>C: 42 GB free of 127 GB</p></article>
-              <article class="sm-tile ok"><h3>Shares</h3><p>3 file shares available</p></article>
+            <div class="sm-section-head"><h2>FILE AND STORAGE SERVICES</h2><p>1 server</p></div>
+            <div class="sm-tile-grid">
+              ${smTile({ title: 'Volumes', count: 1, stamp })}
+              ${smTile({ title: 'Shares', count: 3, stamp })}
             </div>
           </section>
           <section class="sm-view" data-sm-panel="rds" hidden>
-            <h2 class="sm-h">Remote Desktop Services</h2>
-            <div class="sm-banner warn-banner">
-              <strong>Deployment overview</strong>
-              <span>RDP listening on TCP 3389 · Review failed logons in Event Viewer after start-attack</span>
+            <div class="sm-section-head"><h2>REMOTE DESKTOP SERVICES</h2><p>RDP listening on TCP 3389</p></div>
+            <div class="sm-tile-grid">
+              ${smTile({ title: 'Remote Desktop Services', count: 1, critical: true, manageIssues: 1, stamp })}
             </div>
-            <table class="sm-table">
-              <thead><tr><th>Collection</th><th>Type</th><th>Status</th></tr></thead>
-              <tbody>
-                <tr><td>QuickSessionCollection</td><td>Session-based</td><td><span class="pill warn">Exposed</span></td></tr>
-              </tbody>
-            </table>
           </section>
         </main>
       </div>
@@ -351,13 +410,18 @@ function serverManagerHtml(): string {
 function wireServerManager(root: HTMLElement): void {
   const items = root.querySelectorAll<HTMLElement>('.sm-nav-item');
   const panels = root.querySelectorAll<HTMLElement>('.sm-view');
+  const crumb = root.querySelector('#sm-crumb');
   items.forEach((item) => {
     item.addEventListener('click', () => {
-      const view = item.dataset.smView || 'local';
+      const view = item.dataset.smView || 'dashboard';
+      const label = item.dataset.smLabel || 'Dashboard';
       items.forEach((n) => n.classList.toggle('active', n === item));
       panels.forEach((panel) => {
         panel.hidden = panel.dataset.smPanel !== view;
       });
+      if (crumb) {
+        crumb.innerHTML = `<span>Server Manager</span><span class="sep">›</span><span>${label}</span>`;
+      }
     });
   });
 }
@@ -370,49 +434,49 @@ function servicesHtml(): string {
     ['Running', 'Automatic', 'wuauserv', 'Windows Update'],
     ['Stopped', 'Manual', 'RemoteRegistry', 'Remote Registry'],
   ];
-  return `
-    <div class="mmc">
-      <div class="mmc-menubar"><span>File</span><span>Action</span><span>View</span><span>Help</span></div>
-      <div class="mmc-toolbar"><button type="button">Start</button><button type="button">Stop</button><button type="button">Restart</button><span class="mmc-sep"></span><button type="button">Refresh</button></div>
-      <div class="mmc-path">Services (Local)</div>
-      <div class="mmc-body">
-        <aside class="mmc-tree">
-          <div class="mmc-tree-root open">Services (Local)</div>
-          <div class="mmc-tree-item active">Services</div>
-        </aside>
-        <section class="mmc-main">
-          <div class="mmc-list-pane mmc-list-fill">
-            <table class="mmc-table">
-              <thead>
-                <tr><th>Name</th><th>Description</th><th>Status</th><th>Startup Type</th><th>Log On As</th></tr>
-              </thead>
-              <tbody>
-                ${rows
-                  .map(
-                    ([status, startup, name, desc], i) => `
-                  <tr class="mmc-row ${i === 0 ? 'selected' : ''}">
-                    <td>${name}</td>
-                    <td>${desc}</td>
-                    <td>${status}</td>
-                    <td>${startup}</td>
-                    <td>Local System</td>
-                  </tr>`,
-                  )
-                  .join('')}
-              </tbody>
-            </table>
-          </div>
-        </section>
-        <aside class="mmc-actions">
-          <div class="mmc-actions-title">Actions</div>
-          <div class="mmc-actions-group">Services (Local)</div>
-          <button type="button">Connect to another computer...</button>
-          <button type="button">Export List...</button>
-          <button type="button">Help</button>
-        </aside>
-      </div>
-      <div class="mmc-status">${rows.length} service(s)</div>
+  const tree = [
+    mmcTreeNode({ label: 'Console Root', depth: 0, open: true, icon: 'folder' }),
+    mmcTreeNode({ label: 'Services (Local)', depth: 1, open: true, active: true, icon: 'gear' }),
+  ].join('');
+  const center = `
+    <div class="mmc-list-pane mmc-list-fill">
+      <table class="mmc-table">
+        <thead>
+          <tr><th>Name</th><th>Description</th><th>Status</th><th>Startup Type</th><th>Log On As</th></tr>
+        </thead>
+        <tbody>
+          ${rows
+            .map(
+              ([status, startup, name, desc], i) => `
+            <tr class="mmc-row ${i === 0 ? 'selected' : ''}">
+              <td><span class="svc-ico"></span>${name}</td>
+              <td>${desc}</td>
+              <td>${status}</td>
+              <td>${startup}</td>
+              <td>Local System</td>
+            </tr>`,
+            )
+            .join('')}
+        </tbody>
+      </table>
     </div>`;
+  return mmcShell({
+    consolePath: 'Console Root\\Services (Local)',
+    treeHtml: tree,
+    centerHtml: center,
+    actionTitle: 'Services (Local)',
+    actionButtons: [
+      'Connect to another computer...',
+      'Export List...',
+      'New...',
+      'All Tasks ▸',
+      'View ▸',
+      'Refresh',
+      'Properties',
+      'Help',
+    ],
+    status: `${rows.length} service(s)`,
+  });
 }
 
 function tintSvg(svg: string): string {
@@ -640,66 +704,85 @@ function main(): void {
     .windows-tab .tab-body.mmc-body { background: #f0f0f0; color: #1a1a1a; overflow: hidden; }
     .ps-term { height: 100%; }
     .evt-host, .mmc-host { height: 100%; }
+    .windows-tab.mmc-frame .topnavbar-tab { background: #6ec6e6; color: #0b3a4a; }
+    .windows-tab.mmc-frame .nome-tab .title-ico { color: #a4262c; }
+    .windows-tab.mmc-frame .top-left-menu-tab svg { color: #163e4f; }
     .mmc {
       height: 100%; display: grid;
-      grid-template-rows: auto auto auto 1fr auto;
-      font-family: "Segoe UI", Tahoma, sans-serif; font-size: 12px; background: #f0f0f0; color: #1a1a1a;
+      grid-template-rows: 22px 28px 24px 1fr 22px;
+      font-family: "Segoe UI", Tahoma, sans-serif; font-size: 12px;
+      background: #f0f0f0; color: #1a1a1a; border-top: 1px solid #9ecfe3;
     }
     .mmc-menubar {
-      display: flex; gap: 1rem; padding: .2rem .55rem; background: #f3f3f3;
-      border-bottom: 1px solid #d0d0d0; color: #222;
+      display: flex; gap: .15rem; padding: 0 .35rem; align-items: center;
+      background: #f3f3f3; border-bottom: 1px solid #d0d0d0; color: #1b1b1b;
     }
-    .mmc-menubar span { cursor: default; padding: .1rem .25rem; }
+    .mmc-menubar span { cursor: default; padding: .15rem .45rem; }
     .mmc-menubar span:hover { background: #e5f3ff; }
     .mmc-toolbar {
-      display: flex; align-items: center; gap: .35rem; padding: .25rem .45rem;
-      background: linear-gradient(#fafafa, #ececec); border-bottom: 1px solid #c8c8c8;
+      display: flex; align-items: center; gap: .2rem; padding: .2rem .4rem;
+      background: linear-gradient(#fbfbfb, #ebebeb); border-bottom: 1px solid #c8c8c8;
     }
-    .mmc-toolbar button {
-      border: 1px solid transparent; background: transparent; padding: .2rem .45rem;
-      font: inherit; color: #222; border-radius: 2px;
+    .mmc-tool {
+      min-width: 24px; height: 22px; border: 1px solid transparent; background: transparent;
+      font: inherit; color: #1b1b1b; padding: 0 .35rem; cursor: pointer;
     }
-    .mmc-toolbar button:hover:not(:disabled) { border-color: #a8d0f0; background: #e5f3ff; }
-    .mmc-toolbar button:disabled { opacity: .45; }
-    .mmc-sep { width: 1px; height: 1.1rem; background: #c0c0c0; margin: 0 .2rem; }
+    .mmc-tool:hover:not(:disabled) { border-color: #7eb6d8; background: #e5f3ff; }
+    .mmc-tool:disabled { opacity: .4; cursor: default; }
+    .mmc-sep { width: 1px; height: 1.05rem; background: #c0c0c0; margin: 0 .25rem; }
     .mmc-path {
-      padding: .25rem .55rem; background: #fff; border-bottom: 1px solid #c8c8c8;
-      color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      padding: .2rem .55rem; background: #fff; border-bottom: 1px solid #c8c8c8;
+      color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .mmc-body {
-      display: grid; grid-template-columns: 210px 1fr 170px; min-height: 0; height: 100%;
-      border-bottom: 1px solid #c8c8c8;
+      display: grid; grid-template-columns: 250px minmax(0, 1fr) 190px; min-height: 0; height: 100%;
+      background: #fff;
     }
-    .mmc-body-single { grid-template-columns: 1fr; }
     .mmc-tree {
-      background: #fff; border-right: 1px solid #c8c8c8; overflow: auto; padding: .35rem 0;
+      background: #fff; border-right: 1px solid #c8c8c8; overflow: auto; padding: .25rem 0;
+      user-select: none;
     }
-    .mmc-tree-root, .mmc-tree-label, .mmc-tree-item {
-      padding: .2rem .55rem .2rem 1rem; cursor: default; white-space: nowrap;
+    .mmc-node {
+      display: flex; align-items: center; gap: .25rem; padding: .12rem .35rem .12rem calc(6px + var(--d) * 14px);
+      white-space: nowrap; cursor: default; line-height: 1.35;
     }
-    .mmc-tree-root { font-weight: 600; padding-left: .55rem; }
-    .mmc-tree-label { color: #555; font-weight: 600; padding-left: .85rem; }
-    .mmc-tree-item { padding-left: 1.5rem; }
-    .mmc-tree-item:hover, .mmc-tree-label:hover { background: #e5f3ff; }
-    .mmc-tree-item.active { background: #cce8ff; outline: 1px solid #99d1ff; }
-    .mmc-main { display: grid; grid-template-rows: 1fr 140px; min-width: 0; background: #fff; }
+    .mmc-node:hover { background: #e5f3ff; }
+    .mmc-node.active { background: #cce8ff; }
+    .mmc-node .twist {
+      width: 12px; font-size: 9px; color: #555; text-align: center; flex: 0 0 12px;
+    }
+    .mmc-node .twist.empty { visibility: hidden; }
+    .mmc-node .ico {
+      width: 14px; height: 14px; flex: 0 0 14px; background: #6b6b6b; opacity: .85;
+    }
+    .mmc-node .ico.folder { clip-path: polygon(0 22%, 38% 22%, 48% 0, 100% 0, 100% 100%, 0 100%); background: #e8b84a; }
+    .mmc-node .ico.console { background: #c50f1f; border-radius: 1px; }
+    .mmc-node .ico.log { background: #5b9bd5; border-radius: 1px; }
+    .mmc-node .ico.doc { background: #8a8a8a; clip-path: polygon(0 0, 70% 0, 100% 30%, 100% 100%, 0 100%); }
+    .mmc-node .ico.gear {
+      background: transparent; border: 2px solid #666; border-radius: 50%;
+      box-shadow: inset 0 0 0 2px #f0f0f0;
+    }
+    .mmc-node .lbl { overflow: hidden; text-overflow: ellipsis; }
+    .mmc-main { display: grid; grid-template-rows: 1fr 150px; min-width: 0; background: #fff; border-right: 1px solid #c8c8c8; }
     .mmc-list-fill { grid-row: 1 / -1; }
     .mmc-list-pane { overflow: auto; border-bottom: 1px solid #c8c8c8; }
-    .mmc-list-title {
-      padding: .35rem .55rem; font-weight: 600; background: #f7f7f7; border-bottom: 1px solid #e0e0e0;
-    }
     .mmc-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
     .mmc-table th {
-      text-align: left; padding: .3rem .45rem; background: #f5f5f5;
-      border-bottom: 1px solid #d0d0d0; font-weight: 600; position: sticky; top: 0;
+      text-align: left; padding: .28rem .45rem; background: #f5f5f5;
+      border-bottom: 1px solid #d0d0d0; border-right: 1px solid #e4e4e4; font-weight: 600; position: sticky; top: 0;
     }
-    .mmc-table td { padding: .28rem .45rem; border-bottom: 1px solid #eee; vertical-align: top; }
+    .mmc-table td { padding: .28rem .45rem; border-bottom: 1px solid #eee; border-right: 1px solid #f2f2f2; vertical-align: top; }
     .mmc-row { cursor: default; }
     .mmc-row:hover { background: #f5faff; }
     .mmc-row.selected { background: #cce8ff; }
     .mmc-row.fail td { color: #a61f24; }
     .mmc-row .lvl { color: #0078d4; margin-right: .2rem; }
     .mmc-row.fail .lvl { color: #a61f24; }
+    .svc-ico {
+      display: inline-block; width: 12px; height: 12px; margin-right: .35rem;
+      border: 2px solid #666; border-radius: 50%; vertical-align: -1px;
+    }
     .mmc-preview { overflow: auto; padding: .45rem .65rem; background: #fafafa; }
     .mmc-preview-title { font-weight: 700; margin-bottom: .35rem; }
     .mmc-preview-meta {
@@ -711,106 +794,154 @@ function main(): void {
       background: #fff; border: 1px solid #ddd; padding: .45rem; min-height: 2.5rem;
     }
     .mmc-actions {
-      background: #f7f7f7; border-left: 1px solid #c8c8c8; overflow: auto; padding: .35rem;
-      display: flex; flex-direction: column; gap: .15rem;
+      background: #f7f7f7; overflow: auto; padding: 0 0 .35rem;
+      display: flex; flex-direction: column;
     }
-    .mmc-actions-title { font-weight: 700; padding: .2rem .3rem; }
-    .mmc-actions-group { color: #555; font-weight: 600; padding: .35rem .3rem .15rem; }
-    .mmc-actions button {
-      text-align: left; border: 0; background: transparent; padding: .28rem .35rem;
-      font: inherit; color: #0563c1; border-radius: 2px; cursor: pointer;
+    .mmc-actions-title {
+      font-weight: 700; padding: .35rem .55rem; border-bottom: 1px solid #ddd; background: #f0f0f0;
     }
-    .mmc-actions button:hover { background: #e5f3ff; }
+    .mmc-actions-group {
+      display: flex; align-items: center; justify-content: space-between; gap: .35rem;
+      margin: .35rem .35rem .15rem; padding: .28rem .45rem;
+      background: linear-gradient(#d7ebf8, #b7daf0); border: 1px solid #8eb9d6;
+      font-weight: 600; color: #123;
+    }
+    .mmc-collapse {
+      border: 0; background: transparent; cursor: pointer; font-size: 10px; color: #123; padding: 0;
+    }
+    .mmc-action {
+      text-align: left; border: 0; background: transparent; padding: .28rem .65rem;
+      font: inherit; color: #0563c1; cursor: pointer;
+    }
+    .mmc-action:hover { background: #e5f3ff; }
+    .mmc-action.more { margin-top: .15rem; }
     .mmc-status {
-      padding: .2rem .55rem; background: #f3f3f3; border-top: 1px solid #d0d0d0; color: #444;
+      display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 1px; background: #cfcfcf;
+      border-top: 1px solid #bdbdbd; color: #333; font-size: 11px;
     }
+    .mmc-status span { background: #f3f3f3; padding: .15rem .45rem; min-height: 18px; }
     .mmc-dash { padding: .85rem 1rem; display: block; overflow: auto; }
     .mmc-dash h3 { margin: 0 0 .75rem; font-size: 1.05rem; }
     .mmc-props { border-collapse: collapse; width: min(520px, 100%); }
     .mmc-props th, .mmc-props td { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid #e2e2e2; }
     .mmc-props th { width: 40%; color: #555; font-weight: 600; }
-    .windows-tab .tab-body.sm-body { background: #1b1b1b; color: #f3f3f3; overflow: hidden; }
-    .sm { height: 100%; display: grid; grid-template-rows: auto 1fr; font-family: "Segoe UI", Tahoma, sans-serif; font-size: 12.5px; background: #1b1b1b; color: #f3f3f3; }
+    .windows-tab .tab-body.sm-body { background: #f0f0f0; color: #1a1a1a; overflow: hidden; }
+    .sm {
+      height: 100%; display: grid; grid-template-rows: 40px 1fr;
+      font-family: "Segoe UI", Tahoma, sans-serif; font-size: 13px;
+      background: #f0f0f0; color: #1b1b1b;
+    }
     .sm-top {
-      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-      padding: .55rem .85rem; background: #111; border-bottom: 1px solid #2f2f2f;
+      display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+      padding: 0 .75rem; background: #2b2b2b; color: #fff; border-bottom: 1px solid #1f1f1f;
     }
-    .sm-brand { display: flex; align-items: center; gap: .65rem; }
-    .sm-brand-mark {
-      width: 28px; height: 28px; border-radius: 4px;
-      background: linear-gradient(135deg, #60cdff, #0078d4);
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,.2);
+    .sm-top-left { display: flex; align-items: center; gap: .35rem; min-width: 0; }
+    .sm-navbtn, .sm-iconbtn, .sm-link {
+      border: 0; background: transparent; color: #fff; font: inherit; padding: .25rem .45rem; cursor: pointer;
     }
-    .sm-brand-title { font-size: 15px; font-weight: 600; line-height: 1.1; }
-    .sm-brand-sub { font-size: 11px; color: #a6a6a6; }
-    .sm-top-actions { display: flex; align-items: center; gap: .2rem; }
-    .sm-link, .sm-flag, .sm-tasks button {
-      border: 0; background: transparent; color: #ddd; font: inherit; padding: .3rem .55rem;
-      border-radius: 4px; cursor: pointer;
+    .sm-navbtn:disabled { opacity: .35; cursor: default; }
+    .sm-navbtn:hover:not(:disabled), .sm-iconbtn:hover, .sm-link:hover { background: rgba(255,255,255,.12); }
+    .sm-crumb { display: flex; align-items: center; gap: .35rem; white-space: nowrap; overflow: hidden; }
+    .sm-crumb .sep { opacity: .7; }
+    .sm-top-actions { display: flex; align-items: center; gap: .15rem; }
+    .sm-flag {
+      position: relative; border: 0; background: transparent; color: #fff; padding: .2rem .45rem; cursor: pointer;
     }
-    .sm-link:hover, .sm-flag:hover, .sm-tasks button:hover { background: rgba(255,255,255,.08); }
-    .sm-flag { color: #ffb900; font-weight: 600; }
+    .sm-flag .flag { font-size: 14px; }
+    .sm-flag .warn {
+      position: absolute; right: 0; top: 0; font-size: 9px; color: #f0c000;
+      background: #2b2b2b; border-radius: 50%;
+    }
     .sm-shell { display: grid; grid-template-columns: 220px 1fr; min-height: 0; height: 100%; }
     .sm-nav {
-      background: #202020; border-right: 1px solid #2f2f2f; padding: .45rem 0; overflow: auto;
-      display: flex; flex-direction: column;
+      background: #fff; border-right: 1px solid #d4d4d4; overflow: auto;
+      display: flex; flex-direction: column; padding: .35rem 0;
     }
     .sm-nav-item {
-      text-align: left; border: 0; background: transparent; color: #ececec; font: inherit;
-      padding: .55rem .9rem; cursor: pointer; border-left: 3px solid transparent;
+      display: flex; align-items: center; gap: .55rem; text-align: left; border: 0;
+      background: transparent; color: #2b2b2b; font: inherit; padding: .55rem .75rem; cursor: pointer;
     }
-    .sm-nav-item:hover { background: rgba(255,255,255,.06); }
-    .sm-nav-item.active { background: rgba(0,120,212,.28); border-left-color: #60cdff; }
-    .sm-nav-section {
-      margin-top: .55rem; padding: .45rem .9rem .25rem; color: #9a9a9a;
-      font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+    .sm-nav-item:hover { background: #e8e8e8; }
+    .sm-nav-item.active { background: #0078d7; color: #fff; }
+    .sm-nav-ico {
+      width: 14px; height: 14px; flex: 0 0 14px; background: currentColor; opacity: .7;
     }
-    .sm-content { overflow: auto; padding: .85rem 1rem 1.1rem; background: #1f1f1f; }
-    .sm-h { margin: 0 0 .35rem; font-size: 1.35rem; font-weight: 600; }
-    .sm-lead { margin: 0 0 .85rem; color: #bdbdbd; line-height: 1.45; }
-    .sm-local-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .55rem; }
-    .sm-tasks { display: flex; gap: .25rem; }
-    .sm-banner {
-      display: flex; justify-content: space-between; gap: 1rem; align-items: center;
-      padding: .55rem .7rem; margin-bottom: .75rem; border-radius: 4px;
-      background: #252525; border: 1px solid #3a3a3a;
+    .sm-nav-ico.dash { clip-path: polygon(0 0, 45% 0, 45% 45%, 0 45%, 0 55%, 45% 55%, 45% 100%, 0 100%, 0 55%, 55% 55%, 55% 100%, 100% 100%, 100% 55%, 55% 55%, 55% 45%, 100% 45%, 100% 0, 55% 0, 55% 45%, 0 45%); }
+    .sm-nav-ico.server { border-radius: 1px; box-shadow: inset 0 -3px 0 rgba(255,255,255,.35), inset 0 3px 0 rgba(0,0,0,.15); }
+    .sm-nav-ico.list {
+      background: transparent; border-top: 2px solid currentColor; border-bottom: 2px solid currentColor;
+      box-shadow: inset 0 6px 0 -4px currentColor;
     }
-    .sm-banner.warn-banner { border-color: #9a6b00; background: #2a230f; }
-    .sm-banner span { color: #b5b5b5; }
-    .sm-props-grid {
-      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0;
-      border: 1px solid #3a3a3a; border-radius: 4px; overflow: hidden; margin-bottom: 1rem;
+    .sm-nav-ico.folder { clip-path: polygon(0 20%, 35% 20%, 45% 0, 100% 0, 100% 100%, 0 100%); }
+    .sm-nav-ico.rds { border: 2px solid currentColor; background: transparent; box-shadow: inset 3px 3px 0 currentColor; }
+    .sm-content { overflow: auto; padding: .85rem 1rem 1.15rem; background: #f0f0f0; }
+    .sm-section-head { margin-bottom: .75rem; }
+    .sm-section-head h2 {
+      margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .04em; color: #5a5a5a;
     }
-    .sm-prop {
-      display: grid; grid-template-columns: 42% 1fr; gap: .5rem; padding: .45rem .65rem;
-      border-bottom: 1px solid #333; border-right: 1px solid #333; background: #242424;
+    .sm-section-head p { margin: .2rem 0 0; color: #666; font-size: 12px; }
+    .sm-tile-grid {
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem;
     }
-    .sm-prop:nth-child(2n) { border-right: 0; }
-    .sm-prop span { color: #9f9f9f; }
-    .sm-prop strong { font-weight: 600; color: #f0f0f0; }
-    .sm-on { color: #6ccb5f !important; }
-    .sm-warn { color: #ffb900 !important; }
-    .sm-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
     .sm-tile {
-      border-radius: 6px; padding: .85rem .9rem; border: 1px solid #3a3a3a; background: #262626;
-      min-height: 110px;
+      background: #fff; border: 1px solid #cfcfcf; display: grid;
+      grid-template-rows: auto auto 1fr auto; min-height: 168px;
     }
-    .sm-tile h3 { margin: 0 0 .35rem; font-size: 1rem; }
-    .sm-tile p { margin: 0 0 .45rem; color: #c2c2c2; }
-    .sm-tile ul { margin: 0; padding-left: 1.1rem; color: #a8a8a8; }
-    .sm-tile.ok { border-top: 3px solid #6ccb5f; }
-    .sm-tile.warn { border-top: 3px solid #ffb900; }
-    .sm-tile.muted { border-top: 3px solid #0078d4; }
-    .sm-roles, .sm-events { margin-top: .25rem; }
-    .sm-roles h3, .sm-events h3 { margin: 0 0 .45rem; font-size: .95rem; }
-    .sm-table { width: 100%; border-collapse: collapse; background: #242424; border: 1px solid #3a3a3a; }
-    .sm-table th, .sm-table td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid #333; }
-    .sm-table th { background: #2b2b2b; color: #cfcfcf; font-weight: 600; }
+    .sm-tile-head {
+      display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .45rem;
+      padding: .4rem .55rem; background: #e8e8e8; color: #1b1b1b; font-weight: 600;
+    }
+    .sm-tile.critical .sm-tile-head { background: #c50f1f; color: #fff; }
+    .sm-tile-ico {
+      width: 16px; height: 16px; background: currentColor; opacity: .55;
+      mask: linear-gradient(#000 0 0); border-radius: 1px;
+    }
+    .sm-tile-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sm-tile-count { font-weight: 700; }
+    .sm-tile-status {
+      display: flex; align-items: center; gap: .45rem; padding: .4rem .55rem;
+      border-bottom: 1px solid #e4e4e4; color: #333;
+    }
+    .sm-tile.healthy .sm-tile-status { border-top: 2px solid #107c10; }
+    .sm-tile.critical .sm-tile-status { border-top: 2px solid #c50f1f; }
+    .sm-badge {
+      display: inline-grid; place-items: center; width: 18px; height: 18px;
+      font-size: 11px; font-weight: 700; color: #fff;
+    }
+    .sm-badge.ok { background: #107c10; border-radius: 50%; font-size: 10px; }
+    .sm-badge.err { background: #c50f1f; border-radius: 2px; }
+    .sm-tile-links { list-style: none; margin: 0; padding: .35rem 0; }
+    .sm-tile-links li {
+      padding: .22rem .55rem; color: #2b2b2b; cursor: default;
+    }
+    .sm-tile-links li:hover { background: #e5f1fb; color: #0563c1; }
+    .sm-tile-stamp {
+      text-align: right; padding: .25rem .55rem .4rem; color: #8a8a8a; font-size: 11px;
+    }
+    .sm-props-grid.light {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0;
+      border: 1px solid #cfcfcf; background: #fff; overflow: hidden;
+    }
+    .sm-props-grid.light .sm-prop {
+      display: grid; grid-template-columns: 42% 1fr; gap: .5rem; padding: .45rem .65rem;
+      border-bottom: 1px solid #e6e6e6; border-right: 1px solid #e6e6e6; background: #fff;
+    }
+    .sm-props-grid.light .sm-prop:nth-child(2n) { border-right: 0; }
+    .sm-props-grid.light .sm-prop span { color: #666; }
+    .sm-props-grid.light .sm-prop strong { font-weight: 600; color: #1b1b1b; }
+    .sm-on { color: #107c10 !important; }
+    .sm-warn { color: #c50f1f !important; }
+    .sm-table.light { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #cfcfcf; }
+    .sm-table.light th, .sm-table.light td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid #e6e6e6; }
+    .sm-table.light th { background: #f3f3f3; color: #333; font-weight: 600; }
     .pill {
-      display: inline-flex; padding: .1rem .45rem; border-radius: 999px; font-size: 11px; font-weight: 600;
+      display: inline-flex; padding: .1rem .45rem; border-radius: 0; font-size: 11px; font-weight: 600;
     }
-    .pill.ok { background: rgba(108,203,95,.18); color: #6ccb5f; }
-    .pill.warn { background: rgba(255,185,0,.18); color: #ffb900; }
+    .pill.ok { background: #dff6dd; color: #0b6a0b; }
+    .pill.warn { background: #fde7e9; color: #a4262c; }
+    @media (max-width: 1100px) {
+      .sm-tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
     .tb-label { color: #fff; font-size: .7rem; font-weight: 700; }
     #w11-start-section {
       background: rgba(32, 32, 48, 0.72);
@@ -853,16 +984,16 @@ function main(): void {
     }
 
     const titles: Record<WinKind, string> = {
-      events: 'Event Viewer - [WIN-SRV-2025-01]',
-      services: 'Services - [WIN-SRV-2025-01]',
-      server: 'Server Manager - WIN-SRV-2025-01',
+      events: 'Event Viewer - [Event Viewer (Local)\\Windows Logs\\Security]',
+      services: 'Services - [Console Root\\Services (Local)]',
+      server: 'Server Manager',
       ps: 'Administrator: Windows PowerShell',
     };
 
     const tab = document.createElement('div');
-    tab.className = 'windows-tab';
-    tab.style.width = kind === 'events' ? '920px' : kind === 'server' ? '980px' : kind === 'services' ? '820px' : kind === 'ps' ? '720px' : '560px';
-    tab.style.height = kind === 'server' ? '620px' : kind === 'events' || kind === 'services' ? '560px' : kind === 'ps' ? '440px' : '360px';
+    tab.className = `windows-tab${kind === 'events' || kind === 'services' ? ' mmc-frame' : ''}`;
+    tab.style.width = kind === 'events' ? '960px' : kind === 'server' ? '1080px' : kind === 'services' ? '900px' : kind === 'ps' ? '720px' : '560px';
+    tab.style.height = kind === 'server' ? '680px' : kind === 'events' || kind === 'services' ? '580px' : kind === 'ps' ? '440px' : '360px';
     tab.style.left = `${40 + openTabs.size * 28}px`;
     tab.style.top = `${28 + openTabs.size * 24}px`;
     const bodyClass = kind === 'ps' ? 'ps-body' : kind === 'server' ? 'sm-body' : 'mmc-body';
@@ -886,8 +1017,10 @@ function main(): void {
     if (kind === 'server') {
       body.innerHTML = serverManagerHtml();
       wireServerManager(body);
-    } else if (kind === 'services') body.innerHTML = servicesHtml();
-    else if (kind === 'events') {
+    } else if (kind === 'services') {
+      body.innerHTML = servicesHtml();
+      wireMmcChrome(body);
+    } else if (kind === 'events') {
       eventHost = document.createElement('div');
       eventHost.className = 'evt-host';
       eventHost.innerHTML = renderEventViewerMmc(state.attackActive);
