@@ -506,25 +506,25 @@ const executeCommand = (body: ExecInput): ExecResult => {
 
 // HTML Generation
 const baseStyles = `
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;800&family=Space+Mono:wght@400;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap");
 :root {
-  --bg: #fffdf2; --bg2: #fff; --bg3: #fff4a8;
-  --border: #111; --text: #111; --text2: #111; --text3: #333;
-  --accent: #111; --accent2: #ff4d6d; --good: #7dff6b; --bad: #ff4d6d;
+  --bg: #e8eef6; --bg2: #fff; --bg3: #fff4a8;
+  --border: #111; --text: #1a2740; --text2: #1a2740; --text3: #4a5d78;
+  --accent: #0d6dad; --accent2: #0f6e56; --good: #0f6e56; --bad: #9a3412;
   --r: 0px; --r2: 0px; --shadow: 4px 4px 0 #111;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: "Space Grotesk", "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; background-image: linear-gradient(#1111 1px, transparent 1px), linear-gradient(90deg, #1111 1px, transparent 1px); background-size: 22px 22px; }
-.bar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 28px; border-bottom: 3px solid var(--border); background: #ffde00; flex-wrap: wrap; }
+body { font-family: "IBM Plex Sans", "Segoe UI", sans-serif; background: linear-gradient(160deg, #e8eef6 18%, #c5d8ef 100%); color: var(--text); min-height: 100vh; }
+.bar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 28px; border-bottom: 1px solid rgba(26, 39, 64, .14); background: rgba(232, 238, 246, .92); flex-wrap: wrap; }
 .brand { display: flex; align-items: center; gap: 12px; }
-.t { letter-spacing: -.03em; margin: 0; font-size: 18px; font-weight: 800; }
-.st { color: var(--text); margin: 1px 0 0; font-size: 12px; font-weight: 600; }
-.btn { background: #fff; color: #111; letter-spacing: .04em; text-transform: uppercase; box-shadow: var(--shadow); border: 3px solid #111; border-radius: 0; display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; font-size: 13px; font-weight: 800; cursor: pointer; text-decoration: none; }
-.btn:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #111; background: #7dff6b; }
-.panel { background: #fff; border: 3px solid #111; border-radius: 0; box-shadow: 6px 6px 0 #111; padding: 16px 18px 18px; }
-.kicker { letter-spacing: .12em; text-transform: uppercase; color: #111; margin: 0; font-size: 10px; font-weight: 800; background: #7dff6b; display: inline-block; padding: 2px 6px; border: 2px solid #111; }
-.pt { letter-spacing: -.03em; margin: 8px 0 2px; font-size: 20px; font-weight: 800; }
-.cap { color: var(--text3); margin: 0 0 12px; font-size: 13px; font-weight: 600; }
+.t { font-family: Fraunces, Georgia, serif; letter-spacing: -.04em; margin: 0; font-size: 28px; font-weight: 700; }
+.st { color: var(--text3); margin: 2px 0 0; font-size: 12px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.btn { background: #ffde00; color: #111; box-shadow: var(--shadow); border: 3px solid #111; border-radius: 0; display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; font-size: 14px; font-weight: 700; cursor: pointer; text-decoration: none; }
+.btn:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #111; background: #fff; }
+.panel { background: #fff; border: 3px solid #111; border-radius: 0; box-shadow: 5px 5px 0 #111; padding: 16px 18px 18px; }
+.kicker { letter-spacing: .12em; text-transform: uppercase; color: #0f6e56; margin: 0; font-size: 11px; font-weight: 600; font-family: "IBM Plex Mono", ui-monospace, monospace; background: transparent; display: inline-block; padding: 0; border: 0; }
+.pt { font-family: Fraunces, Georgia, serif; letter-spacing: -.03em; margin: 8px 0 2px; font-size: 22px; font-weight: 700; }
+.cap { color: var(--text3); margin: 0 0 12px; font-size: 14px; font-weight: 500; line-height: 1.5; }
 .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); gap: 20px; }
 .tag { letter-spacing: .08em; text-transform: uppercase; border-radius: 0; padding: 2px 8px; font-size: 10px; font-weight: 800; border: 2px solid #111; color: #111; background: #fff; }
@@ -546,7 +546,7 @@ body { font-family: "Space Grotesk", "Segoe UI", sans-serif; background: var(--b
 .sched { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
 .sched th, .sched td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; overflow-wrap: anywhere; }
 .sched th { color: var(--text3); letter-spacing: .08em; text-transform: uppercase; font-size: 10px; }
-.mono { background: #fff4a8; padding: 1px 6px; border: 2px solid #111; border-radius: 0; font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; overflow-wrap: anywhere; }
+.mono { background: #fff4a8; padding: 1px 6px; border: 2px solid #111; border-radius: 0; font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; overflow-wrap: anywhere; }
 `;
 
 const getShellPrompt = (shellType: ShellType, cwd = '/home/blueteam-user'): string => {
@@ -1238,11 +1238,11 @@ ${baseStyles}
 .cst { font-size: 13px; font-weight: 700; color: var(--accent); margin: 0 0 8px; }
 .csi { font-size: 12px; color: var(--text2); line-height: 1.5; margin: 0 0 10px; }
 .cs-label { letter-spacing: .08em; text-transform: uppercase; color: var(--text3); font-size: 10px; font-weight: 700; margin: 0 0 4px; }
-.cs-action { font-family: Consolas,monospace; font-size: 12px; color: var(--good); background: rgba(74,222,128,.08); border: 1px solid rgba(74,222,128,.25); border-radius: var(--r2); padding: 8px 10px; margin: 0; line-height: 1.45; white-space: pre-wrap; }
-.ab-stop { background: rgba(248,113,113,.12); border-color: rgba(248,113,113,.45); color: var(--bad); }
-.ab-stop:hover { border-color: var(--bad); color: #fff; background: rgba(248,113,113,.25); }
+.cs-action { font-family: "IBM Plex Mono", Consolas, monospace; font-size: 14px; font-weight: 500; color: #1a2740; background: #fff; border: 2px solid #1a2740; border-radius: var(--r2); padding: 10px 12px; margin: 0; line-height: 1.5; white-space: pre-wrap; }
+.ab-stop { background: #fff1f2; border-color: #9a3412; color: #9a3412; }
+.ab-stop:hover { border-color: #9a3412; color: #fff; background: #9a3412; }
 .obs { margin-top: 12px; }
-.obs-box { width: 100%; min-height: 140px; resize: vertical; background: #0a0a0a; color: var(--text); border: 1px solid var(--border); border-radius: var(--r2); padding: 10px; font-family: Consolas,monospace; font-size: 12px; line-height: 1.45; }
+.obs-box { width: 100%; min-height: 140px; resize: vertical; background: #0a0a0a; color: #e7f3f1; border: 1px solid var(--border); border-radius: var(--r2); padding: 10px; font-family: Consolas,monospace; font-size: 12px; line-height: 1.45; }
 .obs-box:focus { outline: 1px solid var(--accent); }
 .shell { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; display: flex; flex-direction: column; min-height: 500px; }
 .sh { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 8px; }
@@ -1258,8 +1258,8 @@ ${baseStyles}
 .in:focus { outline: none; }
 .input-line { display: flex; align-items: center; gap: 8px; width: 100%; white-space: nowrap; }
 .sb { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
-.sb-b { background: rgba(74,222,128,.15); color: var(--good); border: 1px solid rgba(74,222,128,.3); }
-.sb-a { background: rgba(248,113,113,.15); color: var(--bad); border: 1px solid rgba(248,113,113,.3); animation: p 1s infinite; }
+.sb-b { background: #e7f6f1; color: #0f6e56; border: 1px solid #0f6e56; }
+.sb-a { background: #fff1f2; color: #9a3412; border: 1px solid #9a3412; animation: p 1s infinite; }
 @keyframes p { 0%,100%{opacity:1}50%{opacity:.7} }
 .ab { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r2); color: var(--text2); padding: 8px 12px; font-size: 12px; cursor: pointer; transition: all .12s; margin-top: 12px; display: inline-flex; align-items: center; gap: 6px; }
 .ab:hover { border-color: var(--text3); color: var(--text); }
