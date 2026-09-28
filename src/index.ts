@@ -104,6 +104,12 @@ const appPath = (base: string, path: string): string => {
   return `${base}${normalized}`;
 };
 
+const siteBar = (base: string, title: string, subtitle: string, extra = ''): string => {
+  const course = 'https://cyber.ensign.quest/';
+  const range = appPath(base, '/');
+  return `<div class="bar"><div class="brand"><div><h1 class="t">${title}</h1><p class="st">${subtitle}</p></div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><a href="${course}" class="btn">Course</a><a href="${range}" class="btn">Range</a>${extra}</div></div>`;
+};
+
 // Helper to escape HTML
 const esc = (t: string): string => {
   return t
@@ -576,8 +582,7 @@ const labsIndexHTML = (base = ''): string => {
 <html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Select Lab - Cyberrange</title><style>${baseStyles}</style>
 </head><body>
-<div class="bar"><div class="brand"><div><h1 class="t">Cyberrange</h1><p class="st">Blue Team Training</p></div></div>
-<div style="display:flex;gap:8px;flex-wrap:wrap"><a href="${appPath(base, '/competition/2025')}" class="btn">2025 Overview</a><a href="${appPath(base, '/')}" class="btn">Dashboard</a></div></div>
+${siteBar(base, 'CyberForce', 'Cyber range', `<a href="${appPath(base, '/competition/2025')}" class="btn">2025 Overview</a>`)}
 <div class="container"><div class="main">
 <a href="${appPath(base, '/')}" class="back">← Back</a>
 <div class="panel"><p class="kicker">Blue Team</p><h2 class="pt">Available Labs</h2>
@@ -1260,8 +1265,7 @@ ${baseStyles}
 .ab:hover { border-color: var(--text3); color: var(--text); }
 </style>
 </head><body>
-<div class="bar"><div class="brand"><div><h1 class="t">${lab.title}</h1><p class="st">${lab.category} • ${lab.difficulty}</p></div></div>
-<div><a href="${appPath(base, '/labs')}" class="btn">All Labs</a></div></div>
+${siteBar(base, lab.title, `${lab.category} • ${lab.difficulty}`, `<a href="${appPath(base, '/labs')}" class="btn">All Labs</a>`)}
 <div class="container"><div class="main">
 <a href="${appPath(base, '/labs')}" class="back">← All Labs</a>
 <div class="lab">
@@ -1338,18 +1342,7 @@ const competitionOverviewHTML = (base = ''): string => `<!doctype html>
   <style>${baseStyles}</style>
 </head>
 <body>
-  <div class="bar">
-    <div class="brand">
-      <div>
-        <h1 class="t">2025 Competition Overview</h1>
-        <p class="st">CyberForce Competition® · Department of Energy</p>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <a href="${appPath(base, '/')}" class="btn">Dashboard</a>
-      <a href="${appPath(base, '/labs')}" class="btn">Labs</a>
-    </div>
-  </div>
+  ${siteBar(base, '2025 Competition Overview', 'CyberForce Competition', `<a href="${appPath(base, '/labs')}" class="btn">Labs</a>`)}
   <div class="container">
     <div class="main">
       <a href="${appPath(base, '/')}" class="back">← Dashboard</a>
@@ -1539,19 +1532,11 @@ const dashboardHTML = (base = ''): string => `<!doctype html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cyberrange Dashboard</title>
+  <title>CyberForce · Cyber range</title>
   <style>${baseStyles}</style>
 </head>
 <body>
-  <div class="bar">
-    <div class="brand">
-      <div>
-        <h1 class="t">Cyberrange Dashboard</h1>
-        <p class="st">Blue Team Training Platform</p>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><a href="${appPath(base, '/competition/2025')}" class="btn">2025 Overview</a><a href="${appPath(base, '/labs')}" class="btn">Labs</a></div>
-  </div>
+  ${siteBar(base, 'CyberForce', 'Course and cyber range', `<a href="${appPath(base, '/labs')}" class="btn">Labs</a>`)}
   <div class="container">
     <div class="main">
       <div class="panel">

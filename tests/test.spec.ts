@@ -31,7 +31,8 @@ describe('Cyberrange Worker', () => {
       expect(response.headers.get('Content-Type')).toContain('text/html');
       
       const html = await response.text();
-      expect(html).toContain('Cyberrange Dashboard');
+      expect(html).toContain('CyberForce');
+      expect(html).toContain('Course');
       expect(html).toContain('Blue Team Training Platform');
       expect(html).toContain('2025 Competition Overview');
       expect(html).toContain('/competition/2025');
@@ -486,7 +487,7 @@ describe('Cyberrange Worker', () => {
       const response = await mockFetch(new Request('http://localhost:8787/range'), {});
       expect(response.status).toBe(200);
       const html = await response.text();
-      expect(html).toContain('Cyberrange Dashboard');
+      expect(html).toContain('CyberForce');
       expect(html).toContain('href="/range/labs"');
     });
 
