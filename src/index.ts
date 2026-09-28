@@ -500,32 +500,33 @@ const executeCommand = (body: ExecInput): ExecResult => {
 
 // HTML Generation
 const baseStyles = `
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;800&family=Space+Mono:wght@400;700&display=swap");
 :root {
-  --bg: #161d17; --bg2: #1f2721; --bg3: #2a342d;
-  --border: #3a453f; --text: #e6edf3; --text2: #b8c5d1; --text3: #7a8a99;
-  --accent: #3b82f6; --accent2: #2563eb; --good: #4ade80; --bad: #f87171;
-  --r: 12px; --r2: 6px; --shadow: 0 1px 3px rgba(0,0,0,.3);
+  --bg: #fffdf2; --bg2: #fff; --bg3: #fff4a8;
+  --border: #111; --text: #111; --text2: #111; --text3: #333;
+  --accent: #111; --accent2: #ff4d6d; --good: #7dff6b; --bad: #ff4d6d;
+  --r: 0px; --r2: 0px; --shadow: 4px 4px 0 #111;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-.bar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 28px; border-bottom: 1px solid var(--border); background: var(--bg); flex-wrap: wrap; }
+body { font-family: "Space Grotesk", "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; background-image: linear-gradient(#1111 1px, transparent 1px), linear-gradient(90deg, #1111 1px, transparent 1px); background-size: 22px 22px; }
+.bar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 28px; border-bottom: 3px solid var(--border); background: #ffde00; flex-wrap: wrap; }
 .brand { display: flex; align-items: center; gap: 12px; }
-.t { letter-spacing: -.01em; margin: 0; font-size: 16px; font-weight: 700; }
-.st { color: var(--text3); margin: 1px 0 0; font-size: 12px; }
-.btn { background: var(--accent); color: #fff; letter-spacing: .06em; text-transform: uppercase; box-shadow: var(--shadow); border: none; border-radius: 999px; display: inline-flex; align-items: center; gap: 8px; padding: 9px 22px; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; }
-.btn:hover { background: var(--accent2); }
-.panel { background: var(--bg); border: 1px solid var(--border); border-top: 3px solid var(--good); border-radius: var(--r); box-shadow: var(--shadow); padding: 16px 18px 18px; }
-.kicker { letter-spacing: .12em; text-transform: uppercase; color: var(--good); margin: 0; font-size: 10px; font-weight: 700; }
-.pt { letter-spacing: -.01em; margin: 6px 0 2px; font-size: 17px; font-weight: 700; }
-.cap { color: var(--text3); margin: 0 0 12px; font-size: 12px; }
+.t { letter-spacing: -.03em; margin: 0; font-size: 18px; font-weight: 800; }
+.st { color: var(--text); margin: 1px 0 0; font-size: 12px; font-weight: 600; }
+.btn { background: #fff; color: #111; letter-spacing: .04em; text-transform: uppercase; box-shadow: var(--shadow); border: 3px solid #111; border-radius: 0; display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; font-size: 13px; font-weight: 800; cursor: pointer; text-decoration: none; }
+.btn:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #111; background: #7dff6b; }
+.panel { background: #fff; border: 3px solid #111; border-radius: 0; box-shadow: 6px 6px 0 #111; padding: 16px 18px 18px; }
+.kicker { letter-spacing: .12em; text-transform: uppercase; color: #111; margin: 0; font-size: 10px; font-weight: 800; background: #7dff6b; display: inline-block; padding: 2px 6px; border: 2px solid #111; }
+.pt { letter-spacing: -.03em; margin: 8px 0 2px; font-size: 20px; font-weight: 800; }
+.cap { color: var(--text3); margin: 0 0 12px; font-size: 13px; font-weight: 600; }
 .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); gap: 20px; }
-.tag { letter-spacing: .08em; text-transform: uppercase; border-radius: 999px; padding: 2px 8px; font-size: 10px; font-weight: 700; border: 1px solid var(--border); color: var(--text2); background: var(--bg); }
-.back { color: var(--accent); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; margin-bottom: 16px; }
+.tag { letter-spacing: .08em; text-transform: uppercase; border-radius: 0; padding: 2px 8px; font-size: 10px; font-weight: 800; border: 2px solid #111; color: #111; background: #fff; }
+.back { color: #111; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 800; margin-bottom: 16px; }
 .back:hover { text-decoration: underline; }
 .main { padding: 24px 0; }
 .list { flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; display: flex; }
-.li { border: 1px solid var(--border); border-radius: var(--r2); background: var(--bg3); padding: 8px 10px; }
+.li { border: 3px solid #111; border-radius: 0; background: #fff; padding: 8px 10px; box-shadow: 3px 3px 0 #111; }
 .lil { color: var(--text); overflow-wrap: anywhere; word-break: break-word; margin: 0; font-size: 13px; font-weight: 600; line-height: 1.35; }
 .lil a { color: var(--accent); }
 .section-gap { margin-top: 20px; }
@@ -533,13 +534,13 @@ body { font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;
 .prose a { color: var(--accent); }
 .sub { font-size: 14px; margin: 16px 0 8px; }
 .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 12px; }
-.fact { border: 1px solid var(--border); border-radius: var(--r2); background: var(--bg3); padding: 10px 12px; }
+.fact { border: 3px solid #111; border-radius: 0; background: #fff4a8; padding: 10px 12px; box-shadow: 3px 3px 0 #111; }
 .fact strong { display: block; letter-spacing: .08em; text-transform: uppercase; color: var(--text3); margin-bottom: 4px; font-size: 10px; }
 .fact span { font-size: 13px; line-height: 1.4; }
 .sched { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
 .sched th, .sched td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; overflow-wrap: anywhere; }
 .sched th { color: var(--text3); letter-spacing: .08em; text-transform: uppercase; font-size: 10px; }
-.mono { background: var(--bg3); padding: 1px 6px; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; overflow-wrap: anywhere; }
+.mono { background: #fff4a8; padding: 1px 6px; border: 2px solid #111; border-radius: 0; font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; overflow-wrap: anywhere; }
 `;
 
 const getShellPrompt = (shellType: ShellType, cwd = '/home/blueteam-user'): string => {
